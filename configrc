@@ -1,0 +1,50 @@
+#-----------------------------------#
+#-- gVimSurfer configuration file --#
+#-----------------------------------#
+
+default_width     = 800
+default_height    = 600
+max_title_length  = 25
+
+#--- Appearance -----
+font                 = monospace normal 8
+#                      bg      fg      ssl fg  input fg
+statusbar_color      = #222222 #FFFFFF #9FBC00 #FFFFFF
+#                      bg      fg      g bg    g fg    hl bg   hl fg
+completion_color     = #DDDDDD #232323 #000000 #DEDEDE #9FBC00 #232323
+notification_color   = #FF1212 #FFFFFF
+
+#--- Browser settings -----
+private_browsing  = false
+full_content_zoom = false
+show_scrollbars   = false
+show_statusbar    = false
+show_tabbar       = true 
+#strict_ssl = false will accept any SSL certificate at face value
+strict_ssl        = false
+
+n_completion_items   = 15
+history_limit        = 50
+zoom_step            = 10
+scroll_step          = 40
+
+user_agent        = Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.36
+home_page         = file:///home/rueno/.local/startpage.html
+ca_bundle         = /etc/ssl/certs/ca-certificates.crt
+external_editor   = gvim
+
+#--- Directories and files -----
+download_dir   = /home/rueno/Downloads/
+config_dir     = .config/gvimsurfer
+bookmarks      = bookmarks
+history        = history
+cookies        = cookies
+sessions       = sessions
+stylesheet     = style.css
+scriptfile     = scripts.js
+
+#--- Search engines -----
+search_engine  = google http://google.com/search?q=%s
+search_engine  = wiki http://wikipedia.org/wiki/%s
+search_engine  = duck http://duckduckgo.com/q=%s&t=gvimsurfer
+
