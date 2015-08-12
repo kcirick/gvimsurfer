@@ -17,18 +17,15 @@ struct {
    } UI;
 
    struct {
-      GdkColor statusbar_bg;
-      GdkColor statusbar_fg;
-      GdkColor statusbar_ssl_fg;
-      GdkColor inputbar_fg;
-      GdkColor completion_fg;
-      GdkColor completion_bg;
-      GdkColor completion_g_bg;
-      GdkColor completion_g_fg;
-      GdkColor completion_hl_fg;
-      GdkColor completion_hl_bg;
-      GdkColor notification_fg;
-      GdkColor notification_bg;
+      gint                 statusbar_height;
+      GdkColor             statusbar_bg;
+      GdkColor             statusbar_fg;
+      GdkColor             statusbar_ssl_fg;
+      GdkColor             inputbar_fg;
+      GdkColor             notification_fg;
+      GdkColor             completion_fg;
+      GdkColor             completion_bg;
+      GdkColor             completion_hl;
       PangoFontDescription *font;
    } Style;
 
@@ -41,7 +38,8 @@ struct {
       GList       *bookmarks;
       GList       *sessions;
       GList       *history;
-      GList       *last_closed;
+      gchar       *last_closed;
+      gchar       *search_handle;
       GList       *search_engines;
       GList       *scripts;
       GdkKeymap   *keymap;
@@ -57,16 +55,15 @@ struct {
 } Client;
 
 //--- Function declarations -----
-void init_client();
-void init_client_data();
-void init_client_settings();
+void        init_client();
+void        init_client_data();
 
-GtkWidget*  create_tab(char*, gboolean);
 void        close_tab(int);
+GtkWidget*  create_tab(char*, gboolean);
 void        new_window(char*);
-
-void update_client();
-void update_statusbar_info();
-void update_statusbar_uri();
+void        set_inputbar_visibility(gint);
+void        update_client();
+void        update_statusbar_info();
+void        update_statusbar_uri();
 
 #endif

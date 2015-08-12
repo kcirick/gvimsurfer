@@ -19,6 +19,7 @@ gboolean    cb_wv_download_request(WebKitWebView*, WebKitDownload*, gpointer);
 gboolean    cb_wv_event(GtkWidget *widget, GdkEvent *event, gpointer user_data); 
 gboolean    cb_wv_hover_link(WebKitWebView*, char*, char*, gpointer);
 gboolean    cb_wv_kb_pressed(WebKitWebView*, GdkEventKey*); 
+gboolean    cb_tab_kb_pressed(WebKitWebView*, GdkEventKey*); 
 gboolean    cb_wv_mimetype_policy_decision(WebKitWebView*, WebKitWebFrame*, WebKitNetworkRequest*, char*, WebKitWebPolicyDecision*, gpointer);
 gboolean    cb_wv_nav_policy_decision(WebKitWebView*, WebKitWebFrame*, WebKitNetworkRequest*, WebKitWebNavigationAction*, WebKitWebPolicyDecision*, gpointer);
 gboolean    cb_wv_notify_progress(WebKitWebView*, GParamSpec*, gpointer);

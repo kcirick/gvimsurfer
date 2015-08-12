@@ -4,7 +4,7 @@ Web browser that looks and works like gVim
 
 Description:
 ------------
-  - Features/functions inspired by jumanji and vimperator
+  - Features/functions inspired by jumanji and vimprobable
   - organized in a way it makes sense
   - Requires following as dependencies:
    - gtk+-2

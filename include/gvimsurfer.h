@@ -29,7 +29,7 @@ enum {
    NEW_TAB, OPEN_EXTERNAL,
    BACKWARD, FORWARD,
    INFO, WARNING, ERROR,
-   SHOW, HIDE, HIGHLIGHT,
+   TOGGLE, SHOW, HIDE, HIGHLIGHT,
    PREVIOUS_GROUP, PREVIOUS, NEXT, NEXT_GROUP,
    ZOOM_ORIGINAL, ZOOM_IN, ZOOM_OUT,
    APPEND_URL,
@@ -39,43 +39,43 @@ enum {
 };
 
 typedef struct {
-   gint   n;
-   void *data;
+   gint     n;
+   void     *data;
 } Argument;
 
 typedef struct {
-   gchar* name;
-   gchar* uri;
+   gchar*   name;
+   gchar*   uri;
 } SearchEngine;
 
 typedef struct {
-   gchar* path;
-   gchar* content;
+   gchar*   path;
+   gchar*   content;
 } Script;
 
 typedef struct {
-   gchar     *name;
-   gchar     *uris;
+   gchar    *name;
+   gchar    *uris;
 } Session;
 
 typedef struct {
-	gchar     *name;
+	gchar    *name;
 	void     *variable;
-	gchar     *webkitvar;
-   gchar     type;
+	gchar    *webkitvar;
+   gchar    type;
 } Setting;
 
 typedef struct {
-   gint id;
-   gint tab_id;
-   gdouble hadjustment;
-   gdouble vadjustment;
-   gfloat zoom_level;
+   gint     id;
+   gint     tab_id;
+   gdouble  hadjustment;
+   gdouble  vadjustment;
+   gfloat   zoom_level;
 } PMark;
 
 typedef struct {
-   gint id;
-   gchar* uri;
+   gint     id;
+   gchar*   uri;
 } QMark;
 
 #endif

@@ -6,8 +6,8 @@
 #define COMMANDS_H
 
 typedef struct {
-   gchar* command;
-   gboolean (*function)(int, char**);
+   gchar*      command;
+   gboolean    (*function)(int, char**);
    Completion* (*completion)(gchar*);
 } Command;
 

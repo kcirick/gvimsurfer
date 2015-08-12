@@ -6,26 +6,26 @@
 #define SHORTCUTS_H
 
 typedef struct {
-   unsigned int mask;
-   char* regex;
-   unsigned int key;
-   void (*function)(Argument*);
-   Argument argument;
+   unsigned int   mask;
+   char*          regex;
+   unsigned int   key;
+   void           (*function)(Argument*);
+   Argument       argument;
 } Shortcut;
 
 typedef struct {
-   unsigned int mask;
-   unsigned int key;
-   void (*function)(Argument*);
-   Argument argument;
+   unsigned int   mask;
+   unsigned int   key;
+   void           (*function)(Argument*);
+   Argument       argument;
 } InputbarShortcut;
 
 typedef struct {
-  unsigned int mask;
-  unsigned int button;
-  void (*function)(Argument*);
-  int mode;
-  Argument argument;
+  unsigned int    mask;
+  unsigned int    button;
+  void            (*function)(Argument*);
+  int             mode;
+  Argument        argument;
 } Mouse;
 
 
@@ -48,7 +48,6 @@ void sc_reopen(Argument*);
 void sc_run_script(Argument*);
 void sc_scroll(Argument*);
 void sc_search(Argument*);
-void sc_toggle_proxy(Argument*);
 void sc_toggle_sourcecode(Argument*);
 void sc_yank(Argument*);
 void sc_zoom(Argument*);

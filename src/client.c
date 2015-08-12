@@ -35,8 +35,7 @@ void init_client() {
    Client.UI.webview       = GTK_NOTEBOOK(gtk_notebook_new());
 
    // Window
-   gtk_window_set_wmclass(GTK_WINDOW(Client.UI.window), "gvimsurfer", "gVimSurfer");
-   gtk_window_set_title(GTK_WINDOW(Client.UI.window), NAME);
+   gtk_window_set_wmclass(GTK_WINDOW(Client.UI.window), TARGET, NAME);
    GdkGeometry hints = { 1, 1 };
    gtk_window_set_geometry_hints(GTK_WINDOW(Client.UI.window), NULL, &hints, GDK_HINT_MIN_SIZE);
    g_signal_connect(G_OBJECT(Client.UI.window), "destroy", G_CALLBACK(cb_destroy), NULL);
@@ -54,12 +53,12 @@ void init_client() {
    gtk_misc_set_alignment(GTK_MISC(Client.Statusbar.uri),      1.0, 0.0);
    gtk_misc_set_alignment(GTK_MISC(Client.Statusbar.info),     1.0, 0.0);
 
-   gtk_misc_set_padding(GTK_MISC(Client.Statusbar.message), 2.0, 4.0);
-   gtk_misc_set_padding(GTK_MISC(Client.Statusbar.uri),     2.0, 4.0);
-   gtk_misc_set_padding(GTK_MISC(Client.Statusbar.info),    2.0, 4.0);
+   gtk_misc_set_padding(GTK_MISC(Client.Statusbar.message), 2.0, 2.0);
+   gtk_misc_set_padding(GTK_MISC(Client.Statusbar.uri),     2.0, 2.0);
+   gtk_misc_set_padding(GTK_MISC(Client.Statusbar.info),    2.0, 2.0);
 
-   gtk_box_pack_start(Client.UI.statusbar_box, GTK_WIDGET(Client.Statusbar.message),   TRUE,    TRUE, 0);
-   gtk_box_pack_start(Client.UI.statusbar_box, GTK_WIDGET(Client.Statusbar.uri),       TRUE,    TRUE, 0);
+   gtk_box_pack_start(Client.UI.statusbar_box, GTK_WIDGET(Client.Statusbar.message),   FALSE,   TRUE,  0);
+   gtk_box_pack_start(Client.UI.statusbar_box, GTK_WIDGET(Client.Statusbar.uri),       TRUE,    TRUE,  0);
    gtk_box_pack_start(Client.UI.statusbar_box, GTK_WIDGET(Client.Statusbar.info),      FALSE,   FALSE, 0);
 
    gtk_container_add(GTK_CONTAINER(Client.UI.statusbar), GTK_WIDGET(Client.UI.statusbar_box));
@@ -82,15 +81,37 @@ void init_client() {
    gtk_box_pack_end(Client.UI.box, GTK_WIDGET(Client.UI.inputbar), FALSE,   FALSE,   0);
    gtk_box_pack_end(Client.UI.box, GTK_WIDGET(Client.UI.statusbar),  FALSE,   FALSE,   0);
 
+   // set statusbar height
    gint w=0, h=0;
    PangoContext *pctx = gtk_widget_get_pango_context(GTK_WIDGET(Client.UI.inputbar));
    PangoLayout *layout = pango_layout_new(pctx);
    pango_layout_set_text(layout, "a", -1);
    pango_layout_set_font_description(layout, Client.Style.font);
    pango_layout_get_size(layout, &w, &h);
-   gint height = h/PANGO_SCALE+4;
-   gtk_widget_set_size_request(GTK_WIDGET(Client.UI.inputbar),    -1, height);
-   gtk_widget_set_size_request(GTK_WIDGET(Client.UI.statusbar),   -1, height);
+   Client.Style.statusbar_height = h/PANGO_SCALE+2;
+
+   // Set statusbar styles
+   gtk_widget_modify_bg(GTK_WIDGET(Client.UI.statusbar),       GTK_STATE_NORMAL, &(Client.Style.statusbar_bg));
+   gtk_widget_modify_fg(GTK_WIDGET(Client.Statusbar.message),  GTK_STATE_NORMAL, &(Client.Style.statusbar_fg));
+   gtk_widget_modify_fg(GTK_WIDGET(Client.Statusbar.uri) ,     GTK_STATE_NORMAL, &(Client.Style.statusbar_fg));
+   gtk_widget_modify_fg(GTK_WIDGET(Client.Statusbar.info),     GTK_STATE_NORMAL, &(Client.Style.statusbar_fg));
+
+   gtk_widget_modify_font(GTK_WIDGET(Client.Statusbar.message),  Client.Style.font);
+   gtk_widget_modify_font(GTK_WIDGET(Client.Statusbar.uri),      Client.Style.font);
+   gtk_widget_modify_font(GTK_WIDGET(Client.Statusbar.info),     Client.Style.font);
+
+   gtk_widget_set_size_request(GTK_WIDGET(Client.UI.statusbar),   -1, Client.Style.statusbar_height);
+
+   // inputbar styles
+   gtk_widget_modify_base(GTK_WIDGET(Client.UI.inputbar), GTK_STATE_NORMAL, &(Client.Style.statusbar_bg));
+   gtk_widget_modify_text(GTK_WIDGET(Client.UI.inputbar), GTK_STATE_NORMAL, &(Client.Style.inputbar_fg));
+   gtk_widget_modify_font(GTK_WIDGET(Client.UI.inputbar),                     Client.Style.font);
+   
+   gtk_widget_set_size_request(GTK_WIDGET(Client.UI.inputbar),    -1, Client.Style.statusbar_height);
+
+   // set window size
+   gtk_window_set_default_size(GTK_WINDOW(Client.UI.window), default_width, default_height);
+
 }
 
 void init_client_data(){
@@ -174,30 +195,6 @@ void init_client_data(){
    g_free(cookie_file);
 }
 
-void init_client_settings(){
-
-   // statusbar
-   gtk_widget_modify_bg(GTK_WIDGET(Client.UI.statusbar),       GTK_STATE_NORMAL, &(Client.Style.statusbar_bg));
-   gtk_widget_modify_fg(GTK_WIDGET(Client.Statusbar.message),  GTK_STATE_NORMAL, &(Client.Style.statusbar_fg));
-   gtk_widget_modify_fg(GTK_WIDGET(Client.Statusbar.uri) ,     GTK_STATE_NORMAL, &(Client.Style.statusbar_fg));
-   gtk_widget_modify_fg(GTK_WIDGET(Client.Statusbar.info),     GTK_STATE_NORMAL, &(Client.Style.statusbar_fg));
-
-   gtk_widget_modify_font(GTK_WIDGET(Client.Statusbar.message),  Client.Style.font);
-   gtk_widget_modify_font(GTK_WIDGET(Client.Statusbar.uri),      Client.Style.font);
-   gtk_widget_modify_font(GTK_WIDGET(Client.Statusbar.info),     Client.Style.font);
-
-   // inputbar
-   gtk_widget_modify_base(GTK_WIDGET(Client.UI.inputbar), GTK_STATE_NORMAL, &(Client.Style.statusbar_bg));
-   gtk_widget_modify_text(GTK_WIDGET(Client.UI.inputbar), GTK_STATE_NORMAL, &(Client.Style.inputbar_fg));
-   gtk_widget_modify_font(GTK_WIDGET(Client.UI.inputbar),                     Client.Style.font);
-
-   // set window size
-   gtk_window_set_default_size(GTK_WINDOW(Client.UI.window), default_width, default_height);
-
-   // set proxy
-   sc_toggle_proxy(NULL);
-}
-
 GtkWidget* create_tab(char* uri, gboolean background) {
    if(!uri)           uri = home_page;
 
@@ -230,11 +227,10 @@ GtkWidget* create_tab(char* uri, gboolean background) {
    g_signal_connect(G_OBJECT(wv),  "notify::title",                        G_CALLBACK(cb_wv_notify_title),             NULL);
    g_signal_connect(G_OBJECT(wv),  "window-object-cleared",                G_CALLBACK(cb_wv_window_object_cleared),    NULL);
    g_signal_connect(G_OBJECT(wv),  "key-press-event",                      G_CALLBACK(cb_wv_kb_pressed),               NULL);
-   //g_signal_connect(G_OBJECT(wv),  "event",                                G_CALLBACK(cb_wv_event),             NULL);
 
    // connect tab callbacks
    GtkAdjustment* adjustment = gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(tab));
-   g_signal_connect(G_OBJECT(tab),        "key-press-event", G_CALLBACK(cb_wv_kb_pressed), NULL);
+   g_signal_connect(G_OBJECT(tab),        "key-press-event", G_CALLBACK(cb_tab_kb_pressed), NULL);
    g_signal_connect(G_OBJECT(adjustment), "value-changed",   G_CALLBACK(cb_wv_scrolled),    NULL);
 
    /* set default values */
@@ -275,6 +271,7 @@ GtkWidget* create_tab(char* uri, gboolean background) {
 
    // open uri 
    open_uri(WEBKIT_WEB_VIEW(wv), uri);
+   change_mode(NORMAL);
 
    return GTK_WIDGET(wv);
 }
@@ -294,8 +291,7 @@ void close_tab(int tab_id) {
       list = g_list_next(list);
    }
 
-   gchar *uri = g_strdup((gchar *) webkit_web_view_get_uri(GET_CURRENT_TAB()));
-   Client.Global.last_closed = g_list_prepend(Client.Global.last_closed, uri);
+   Client.Global.last_closed = g_strdup((gchar *) webkit_web_view_get_uri(GET_CURRENT_TAB()));
 
    if (gtk_notebook_get_n_pages(Client.UI.webview) > 1) {
       gtk_notebook_remove_page(Client.UI.webview, tab_id);
@@ -307,10 +303,7 @@ void close_tab(int tab_id) {
 void new_window(char* uri) {
    if(!uri)     return;
 
-   char* nargv[6];
-   nargv[0] = TARGET;
-   nargv[1] = uri;
-   nargv[2] = NULL;
+   char* nargv[3] = { TARGET, uri, NULL };
 
    g_spawn_async(NULL, nargv, NULL, G_SPAWN_SEARCH_PATH, NULL, NULL, NULL, NULL);
 }
@@ -359,29 +352,26 @@ void update_statusbar_info() {
       g_string_append_c(navigation, webkit_web_view_can_go_back(GET_CURRENT_TAB())?'<':'-');
       g_string_append_c(navigation, webkit_web_view_can_go_forward(GET_CURRENT_TAB())?'>':'-');
 
-      g_string_append_printf(status, "[%s]", navigation->str);
+      g_string_append_printf(status, " [%s]\t", navigation->str);
       g_string_free(navigation, TRUE);
 
       //page load status
       gint progress = -1;
       progress = webkit_web_view_get_progress(GET_CURRENT_TAB())*100;
       if(progress>0)
-         g_string_append_printf(status, "[%d%%]", progress);
+         g_string_append_printf(status, "[%d%%]\t", progress);
 
       // download status
-      progress = -1;
       if(Client.Global.active_downloads){
          gint download_count = g_list_length(Client.Global.active_downloads);
-         progress=0;
-         GList *ptr;
 
-         for(ptr = Client.Global.active_downloads; ptr; ptr= g_list_next(ptr))
+         progress=0;
+         for(GList *ptr = Client.Global.active_downloads; ptr; ptr= g_list_next(ptr))
             progress += 100*webkit_download_get_progress(ptr->data);
 
          progress /= download_count;
 
-         if(progress>0)
-            g_string_append_printf(status, "[%d DL: %d%%]", download_count, progress);
+         g_string_append_printf(status, "[%d DL: %d%%]\t", download_count, progress);
       }
    }
 
@@ -411,23 +401,32 @@ void update_statusbar_uri() {
    gchar* uri = link?g_strdup_printf("%s", link):NULL;
 
    /* check for https */
-   GdkColor* fg;
-   GdkColor* bg;
    gboolean ssl = link ? g_str_has_prefix(link, "https://") : FALSE;
-   if(ssl) {
-      fg = &(Client.Style.statusbar_ssl_fg);
-      bg = &(Client.Style.statusbar_bg);
-   } else {
-      fg = &(Client.Style.statusbar_fg);
-      bg = &(Client.Style.statusbar_bg);
-   }
+   GdkColor* fg;
+   if(ssl)  fg = &(Client.Style.statusbar_ssl_fg);
+   else     fg = &(Client.Style.statusbar_fg);
 
-   gtk_widget_modify_bg(GTK_WIDGET(Client.UI.statusbar),       GTK_STATE_NORMAL, bg);
    gtk_widget_modify_fg(GTK_WIDGET(Client.Statusbar.uri),      GTK_STATE_NORMAL, fg);
 
    if(!uri) uri = g_strdup("[No name]");
 
    gtk_label_set_text((GtkLabel*) Client.Statusbar.uri, uri);
    g_free(uri);
+}
+
+void set_inputbar_visibility(gint visibility){
+
+   gboolean is_visible = GTK_WIDGET_VISIBLE(GTK_WIDGET(Client.UI.inputbar));
+
+   if(visibility==HIDE || (visibility==TOGGLE && is_visible)){
+      gtk_widget_hide(GTK_WIDGET(Client.UI.inputbar));
+      if(show_statusbar)
+         gtk_widget_show(GTK_WIDGET(Client.UI.statusbar));
+      else
+         gtk_widget_hide(GTK_WIDGET(Client.UI.statusbar));
+   }else if(visibility==SHOW || (visibility==TOGGLE && !is_visible)){
+      gtk_widget_show(GTK_WIDGET(Client.UI.inputbar));
+      gtk_widget_hide(GTK_WIDGET(Client.UI.statusbar));
+   }
 }
 

@@ -18,7 +18,6 @@
 #include "config/config.h"
 #include "config/settings.h"
 
-// Completion implementation: TODO : Blah
 
 CompletionGroup*  cg_create(char*);
 void              cg_add_element(CompletionGroup*, char*);
@@ -44,8 +43,10 @@ void completion_free(Completion* completion) {
 
 //--- Completion Row -----
 GtkEventBox* cr_create(GtkBox* results, char* command, gboolean group) {
-   GtkBox      *col = GTK_BOX(gtk_hbox_new(FALSE, 0));
+   GtkBox      *col = GTK_BOX(gtk_vbox_new(FALSE, 0));
    GtkEventBox *row = GTK_EVENT_BOX(gtk_event_box_new());
+   GtkWidget   *separator = gtk_hseparator_new();
+   gtk_widget_modify_bg(separator, GTK_STATE_NORMAL, &(Client.Style.completion_fg));
 
    GtkLabel *show_command     = GTK_LABEL(gtk_label_new(NULL));
 
@@ -53,19 +54,18 @@ GtkEventBox* cr_create(GtkBox* results, char* command, gboolean group) {
    gtk_misc_set_padding(GTK_MISC(show_command),    1.0, 1.0);
 
    gtk_label_set_use_markup(show_command, TRUE);
-   gtk_label_set_markup(show_command,     g_markup_printf_escaped("<b>%s</b>", command ? command : ""));
 
-   if(group) {
-      gtk_widget_modify_fg(GTK_WIDGET(show_command),     GTK_STATE_NORMAL, &(Client.Style.completion_g_fg));
-      gtk_widget_modify_bg(GTK_WIDGET(row),              GTK_STATE_NORMAL, &(Client.Style.completion_g_bg));
-   } else {
-      gtk_widget_modify_fg(GTK_WIDGET(show_command),     GTK_STATE_NORMAL, &(Client.Style.completion_fg));
-      gtk_widget_modify_bg(GTK_WIDGET(row),              GTK_STATE_NORMAL, &(Client.Style.completion_bg));
-   }
+   gtk_label_set_markup(show_command, group ? 
+      g_markup_printf_escaped("<b>%s</b>",   command ? command : "") :
+      g_markup_printf_escaped("%s",          command ? command : "") );
+   
+   gtk_widget_modify_fg(GTK_WIDGET(show_command),     GTK_STATE_NORMAL, &(Client.Style.completion_fg));
+   gtk_widget_modify_bg(GTK_WIDGET(row),              GTK_STATE_NORMAL, &(Client.Style.completion_bg));
+   gtk_widget_modify_font(GTK_WIDGET(show_command),   Client.Style.font);
+   if(!group) gtk_widget_set_size_request(GTK_WIDGET(row),    -1, Client.Style.statusbar_height);
 
-   gtk_widget_modify_font(GTK_WIDGET(show_command),     Client.Style.font);
-
-   gtk_box_pack_start(GTK_BOX(col), GTK_WIDGET(show_command),     TRUE,  TRUE,  2);
+   gtk_box_pack_start(GTK_BOX(col), GTK_WIDGET(show_command),     TRUE,  TRUE,  0);
+   if(group) gtk_box_pack_start(GTK_BOX(col), separator, TRUE, TRUE, 0);
    gtk_container_add(GTK_CONTAINER(row), GTK_WIDGET(col));
    gtk_box_pack_start(results, GTK_WIDGET(row), FALSE, FALSE, 0);
 
@@ -78,16 +78,10 @@ void cr_set_color(GtkBox* results, int mode, int id) {
    GtkEventBox *row   = (GtkEventBox*) g_list_nth_data(gtk_container_get_children(GTK_CONTAINER(results)), id);
 
    if(row) {
-      GtkBox      *col   = (GtkBox*)      g_list_nth_data(gtk_container_get_children(GTK_CONTAINER(row)), 0);
-      GtkLabel    *cmd   = (GtkLabel*)    g_list_nth_data(gtk_container_get_children(GTK_CONTAINER(col)), 0);
-
-      if(mode == NORMAL) {
-         gtk_widget_modify_fg(GTK_WIDGET(cmd),   GTK_STATE_NORMAL, &(Client.Style.completion_fg));
+      if(mode == NORMAL)
          gtk_widget_modify_bg(GTK_WIDGET(row),   GTK_STATE_NORMAL, &(Client.Style.completion_bg));
-      } else {
-         gtk_widget_modify_fg(GTK_WIDGET(cmd),   GTK_STATE_NORMAL, &(Client.Style.completion_hl_fg));
-         gtk_widget_modify_bg(GTK_WIDGET(row),   GTK_STATE_NORMAL, &(Client.Style.completion_hl_bg));
-      }
+      else
+         gtk_widget_modify_bg(GTK_WIDGET(row),   GTK_STATE_NORMAL, &(Client.Style.completion_hl));
    }
 }
 

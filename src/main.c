@@ -3,7 +3,6 @@
  */
 
 #include <stdlib.h>
-#include <string.h>
 
 #include <gtk/gtk.h>
 #include <webkit/webkit.h>
@@ -20,35 +19,39 @@ static const gchar default_config_file[] = ".config/gvimsurfer/configrc";
 //----------------
 int main(int argc, char* argv[]) {
 
-   gtk_init(&argc, &argv);
+   static GError *err;
+   static gboolean version = FALSE;
+   static const gchar* cfile = NULL;
+   static GOptionEntry opts[] = {
+      { "version", 'v', 0, G_OPTION_ARG_NONE, &version, "Print version", NULL },
+      { "configfile",  'c', 0, G_OPTION_ARG_STRING, &cfile, "Specify config file", NULL },
+      { NULL } };
 
-   if(argc==2 && !strcmp("-v", argv[1]))
+   if (!gtk_init_with_args(&argc, &argv, "[URL1 URL2 ...]", opts, NULL, &err))
+      say(ERROR, err->message, EXIT_FAILURE);
+
+   if (version)
       say(INFO, "Version "VERSION, EXIT_SUCCESS);
-   else if(argc==2 && !strcmp("-h", argv[1]))
-      say(INFO, "Usage: gvimsurfer [-v][-h][-c configfile][URL1 URL2 ...]", EXIT_SUCCESS);
 
-   gint ioffset=0;
+   // read config file
    gchar* configfile=NULL;
-   if(argc>2 && !strcmp("-c", argv[1])){
-      configfile = argv[2];
-      ioffset+=2;
-   } else
+   if (cfile)
+      configfile = g_strdup(cfile);
+   else
       configfile = g_build_filename(g_get_home_dir(), default_config_file, NULL);
 
    if(!read_configuration(configfile)) 
       say(ERROR, g_strdup_printf("Invalid configuration file: %s", configfile), EXIT_FAILURE);
 
    // init client and read configuration
-   init_search_items();
    init_client();
-   init_client_settings();
    init_client_data();
 
    // create tab 
-   if(argc-ioffset < 2)
+   if(argc < 2)
       create_tab(NULL, TRUE);
    else
-      for(gint i=ioffset+1; i < argc; i++)
+      for(gint i=1; i<argc; i++)
          create_tab(argv[i], TRUE);
 
    gtk_widget_show_all(GTK_WIDGET(Client.UI.window));

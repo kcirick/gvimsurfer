@@ -37,6 +37,17 @@ void say(int type, const char *message, int exit_type){
       exit(exit_type);
 }
 
+void notify(int level, char* message) {
+   if(!message || strlen(message) <= 0) return;
+
+   if(level==ERROR || level==WARNING)
+      gtk_widget_modify_fg(GTK_WIDGET(Client.Statusbar.message), GTK_STATE_NORMAL, &(Client.Style.notification_fg));
+   else 
+      gtk_widget_modify_fg(GTK_WIDGET(Client.Statusbar.message), GTK_STATE_NORMAL, &(Client.Style.statusbar_fg));
+
+   gtk_label_set_text((GtkLabel*) Client.Statusbar.message, message);
+}
+
 void open_uri(WebKitWebView* web_view, char* uri) {
    if(!uri)              return;
    while (*uri == ' ')   uri++;
@@ -111,9 +122,32 @@ void open_uri(WebKitWebView* web_view, char* uri) {
    update_client();
 }
 
-void init_search_items(){
-   search_item = NULL;
-   search_item_changed = FALSE;
+void set_proxy(gboolean onoff) {
+   gchar   *filename, *new;
+
+   if(!onoff) {
+      g_object_set(Client.Global.soup_session, "proxy-uri", NULL, NULL);
+
+      notify(INFO, "Proxy deactivated");
+   } else {
+      filename = (char*) g_getenv("http_proxy");
+      if(filename==NULL)   filename = (char*) g_getenv("HTTP_PROXY");
+
+      if(filename==NULL) {
+         say(WARNING, "No proxy defined", -1);
+         return;
+      }
+
+      new = g_strrstr(filename, "://") ? g_strdup(filename) : g_strconcat("http://", filename, NULL);
+      SoupURI* proxy_uri = soup_uri_new(new);
+
+      g_object_set(Client.Global.soup_session, "proxy-uri", proxy_uri, NULL);
+
+      soup_uri_free(proxy_uri);
+      g_free(new);
+
+      notify(INFO, "Proxy activated");
+   }
 }
 
 void change_mode(int mode) {
@@ -127,7 +161,7 @@ void change_mode(int mode) {
          mode_text = "-- VISUAL --";
          break;
       case FOLLOW:
-         mode_text = "Follow hint: ";
+         mode_text = "-- FOLLOW -- ";
          break;
       case PASS_THROUGH:
          mode_text = "-- PASS THROUGH --";
@@ -138,37 +172,12 @@ void change_mode(int mode) {
       default:
          mode_text = "";
          mode      = NORMAL;
-         gtk_widget_grab_focus(GTK_WIDGET(GET_CURRENT_TAB()));
+         //gtk_widget_grab_focus(GTK_WIDGET(GET_CURRENT_TAB()));
+         gtk_widget_grab_focus(GTK_WIDGET(GET_CURRENT_TAB_WIDGET()));
          break;
    }
    Client.Global.mode = mode;
-   notify(INFO, mode_text);
-}
-
-void notify(int level, char* message) {
-
-   if(!message || strlen(message) <= 0) {
-      gtk_widget_hide(GTK_WIDGET(Client.UI.inputbar));
-      gtk_widget_show(GTK_WIDGET(Client.UI.statusbar));
-      //return;
-   }
-
-   if(!strcmp(message,":") && !(GTK_WIDGET_VISIBLE(GTK_WIDGET(Client.UI.inputbar)))){
-      gtk_widget_show(GTK_WIDGET(Client.UI.inputbar));
-      gtk_widget_hide(GTK_WIDGET(Client.UI.statusbar));
-   }
-
-   if(level==ERROR ||level==WARNING){
-      gtk_widget_modify_base(GTK_WIDGET(Client.UI.inputbar), GTK_STATE_NORMAL, &(Client.Style.notification_bg));
-      gtk_widget_modify_text(GTK_WIDGET(Client.UI.inputbar), GTK_STATE_NORMAL, &(Client.Style.notification_fg));
-   } else {
-      gtk_widget_modify_base(GTK_WIDGET(Client.UI.inputbar), GTK_STATE_NORMAL, &(Client.Style.statusbar_bg));
-      gtk_widget_modify_text(GTK_WIDGET(Client.UI.inputbar), GTK_STATE_NORMAL, &(Client.Style.inputbar_fg));
-   }
-   gtk_label_set_text((GtkLabel*) Client.Statusbar.message, message);
-   
-   if(message)
-      gtk_entry_set_text(Client.UI.inputbar, message);
+   gtk_label_set_text((GtkLabel*) Client.Statusbar.message, mode_text);
 }
 
 char* reference_to_string(JSContextRef context, JSValueRef reference) {
@@ -283,7 +292,6 @@ gboolean read_configuration(char* configrc) {
       if(!strcmp(id, "cookies"))      cookies = value;
       if(!strcmp(id, "sessions"))     sessions = value;
       if(!strcmp(id, "stylesheet"))   stylesheet = value;
-      if(!strcmp(id, "scriptfile"))   scriptfile = value;
 
       // Search Engines
       if(!strcmp(id, "search_engine")){
@@ -299,65 +307,41 @@ gboolean read_configuration(char* configrc) {
          g_free(entries);
       }
 
+      // Loading Scripts
+      if(!strcmp(id, "scriptfile")){
+         char* my_argv[1] = { g_strdup_printf("~/%s/%s", config_dir, value) };
+         cmd_script(1, my_argv);
+      }
+
       // Appearance
       if(!strcmp(id, "font"))   
          Client.Style.font = pango_font_description_from_string(value);
       if(!strcmp(id, "statusbar_color")){
          gchar   **colors  = g_strsplit_set(value, " ", -1);
          gint   num_colors = g_strv_length(colors);
-         if(num_colors !=4) say(WARNING, "Numbers of colors is not 4!", -1);
+         if(num_colors !=5) say(WARNING, "Numbers of colors is not 5!", -1);
          
          gdk_color_parse(colors[0],    &(Client.Style.statusbar_bg));
          gdk_color_parse(colors[1],    &(Client.Style.statusbar_fg));
          gdk_color_parse(colors[2],    &(Client.Style.statusbar_ssl_fg));
          gdk_color_parse(colors[3],    &(Client.Style.inputbar_fg));
+         gdk_color_parse(colors[4],    &(Client.Style.notification_fg));
          g_free(colors);
       }
       if(!strcmp(id, "completion_color")){
          gchar    **colors = g_strsplit_set(value, " ", -1);
          gint   num_colors = g_strv_length(colors);
-         if(num_colors !=6) say(WARNING, "Numbers of colors is not 6!", -1);
+         if(num_colors !=3) say(WARNING, "Numbers of colors is not 3!", -1);
          
          gdk_color_parse(colors[0],    &(Client.Style.completion_bg));
          gdk_color_parse(colors[1],    &(Client.Style.completion_fg));
-         gdk_color_parse(colors[2],    &(Client.Style.completion_g_bg));
-         gdk_color_parse(colors[3],    &(Client.Style.completion_g_fg));
-         gdk_color_parse(colors[4],    &(Client.Style.completion_hl_bg));
-         gdk_color_parse(colors[5],    &(Client.Style.completion_hl_fg));
-         g_free(colors);
-      }
-      if(!strcmp(id, "notification_color")){
-         gchar    **colors = g_strsplit_set(value, " ", -1);
-         gint   num_colors = g_strv_length(colors);
-         if(num_colors !=2) say(WARNING, "Numbers of colors is not 2!", -1);
-         
-         gdk_color_parse(colors[0],    &(Client.Style.notification_bg));
-         gdk_color_parse(colors[1],    &(Client.Style.notification_fg));
+         gdk_color_parse(colors[2],    &(Client.Style.completion_hl));
          g_free(colors);
       }
    }
    g_free(lines);
 
    return TRUE;
-}
-
-char* read_file(const char* path) {
-   char* content = NULL;
-
-   /* get filename */
-   gchar* file;
-
-   if(path[0] == '~')
-      file = g_build_filename(g_get_home_dir(), path + 1, NULL);
-   else
-      file = g_strdup(path);
-
-   /* check if file exists */
-   if(g_file_test(file, G_FILE_TEST_IS_REGULAR))
-      if(g_file_get_contents(file, &content, NULL, NULL))
-         return content;
-
-   return NULL;
 }
 
 void load_all_scripts() {
@@ -375,23 +359,32 @@ void load_all_scripts() {
 
 gboolean search_and_highlight(Argument* argument) {
    static WebKitWebView* last_wv = NULL;
+   gboolean search_handle_changed = FALSE;
 
-   if(search_item && !strlen(search_item)) return FALSE;
+   if(!Client.Global.search_handle || !strlen(Client.Global.search_handle)){
+      if(argument->data)
+         Client.Global.search_handle = g_strdup(argument->data);
+      else
+         return FALSE;
+   }
+
+   if(argument->data && strcmp(Client.Global.search_handle, (gchar*)argument->data)!=0){
+      Client.Global.search_handle = g_strdup(argument->data);
+      search_handle_changed = TRUE;
+   }
 
    WebKitWebView* current_wv = GET_CURRENT_TAB();
-
-   if(search_item_changed || last_wv != current_wv) {
+   
+   if(search_handle_changed || last_wv != current_wv) {
       webkit_web_view_unmark_text_matches(current_wv);
-      webkit_web_view_mark_text_matches(current_wv, search_item, FALSE, 0);
+      webkit_web_view_mark_text_matches(current_wv, Client.Global.search_handle, FALSE, 0);
       webkit_web_view_set_highlight_text_matches(current_wv, TRUE);
 
       last_wv = current_wv;
    }
-
    gboolean direction = (argument->n == BACKWARD) ? FALSE : TRUE;
-   webkit_web_view_search_text(current_wv, search_item, FALSE, direction, TRUE);
+   webkit_web_view_search_text(current_wv, Client.Global.search_handle, FALSE, direction, TRUE);
 
-   search_item_changed = FALSE;
    return FALSE;
 }
 
@@ -399,8 +392,7 @@ gboolean sessionsave(char* session_name) {
    GString* session_uris = g_string_new("");
 
    for (int i = 0; i < gtk_notebook_get_n_pages(Client.UI.webview); i++) {
-      gchar* tab_uri_t = (gchar*) webkit_web_view_get_uri(GET_NTH_TAB(i));
-      gchar* tab_uri   = g_strconcat(tab_uri_t, " ", NULL);
+      gchar* tab_uri   = g_strconcat(webkit_web_view_get_uri(GET_NTH_TAB(i)), " ", NULL);
       session_uris     = g_string_append(session_uris, tab_uri);
 
       g_free(tab_uri);
@@ -427,7 +419,6 @@ gboolean sessionsave(char* session_name) {
       Client.Global.sessions = g_list_prepend(Client.Global.sessions, se);
    }
 
-   /* we don't free session_uris->str , just session_uris */
    g_string_free(session_uris, FALSE);
 
    return TRUE;

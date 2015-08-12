@@ -17,8 +17,8 @@ typedef struct {
 typedef struct {
    gchar*      command;
    gint        command_id;
-   gboolean   is_group;
-   GtkWidget* row;
+   gboolean    is_group;
+   GtkWidget*  row;
 } CompletionRow;
 
 

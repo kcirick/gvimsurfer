@@ -143,7 +143,9 @@ gboolean cmd_quickmark(int argc, char** argv){
 }
 
 gboolean cmd_quit(int argc, char** argv) {
-   sc_close_tab(NULL);
+   gint current_tab = gtk_notebook_get_current_page(Client.UI.webview);
+   close_tab(current_tab);
+
    return TRUE;
 }
 
@@ -161,7 +163,7 @@ gboolean cmd_reload(int argc, char** argv) {
       int number_of_tabs = gtk_notebook_get_n_pages(Client.UI.webview);
 
       for(int i=0; i<number_of_tabs; i++)
-         webkit_web_view_reload_bypass_cache(GET_NTH_TAB(i));
+         webkit_web_view_reload(GET_NTH_TAB(i));
    }
    return TRUE;
 }
@@ -198,7 +200,14 @@ gboolean cmd_script(int argc, char** argv) {
    if(argc < 1)    return TRUE;
 
    char* path    = argv[0];
-   char* content = read_file(path);
+   char* content = NULL;
+
+   gchar* file;
+   if(path[0] == '~')   file = g_build_filename(g_get_home_dir(), path + 1, NULL);
+   else                 file = g_strdup(path);
+
+   if(g_file_test(file, G_FILE_TEST_IS_REGULAR))
+      g_file_get_contents(file, &content, NULL, NULL);
 
    if(!content) {
       gchar* message = g_strdup_printf("Could not open or read file '%s'", path);
@@ -254,10 +263,8 @@ gboolean cmd_stop(int argc, char** argv) {
 }
 
 gboolean cmd_settings(int argc, char** argv) {
-   // needs at least 2 arguments
    if(argc < 2)   return TRUE;
 
-   // get webkit settings 
    WebKitWebSettings* browser_settings = (WebKitWebSettings*)webkit_web_view_get_settings(GET_CURRENT_TAB());
 
    for(unsigned int i = 0; i < LENGTH(settings); i++) {
@@ -328,7 +335,8 @@ gboolean cmd_settings(int argc, char** argv) {
                gtk_window_resize(GTK_WINDOW(Client.UI.window), x, y);
             }
             if(!strcmp(argv[0], "proxy")){
-               sc_toggle_proxy(NULL);
+               gboolean value = !strcmp(argv[1], "false") ? FALSE : TRUE;
+               set_proxy(value);
             }
          }
       }

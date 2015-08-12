@@ -40,13 +40,13 @@ void sc_abort(Argument* argument) {
    change_mode(NORMAL);
 
    // Hide inputbar
-   gtk_widget_hide(GTK_WIDGET(Client.UI.inputbar));
-   gtk_widget_show(GTK_WIDGET(Client.UI.statusbar));
+   set_inputbar_visibility(HIDE);
 
    // Unmark search results
    webkit_web_view_unmark_text_matches(GET_CURRENT_TAB());
 
    gtk_widget_grab_focus(GTK_WIDGET(GET_CURRENT_TAB_WIDGET()));
+   //gtk_widget_grab_focus(GTK_WIDGET(GET_CURRENT_TAB()));
 }
 
 void sc_change_mode(Argument* argument) {
@@ -55,8 +55,7 @@ void sc_change_mode(Argument* argument) {
 }
 
 void sc_close_tab(Argument* argument) {
-   gint current_tab = gtk_notebook_get_current_page(Client.UI.webview);
-   close_tab(current_tab);
+   cmd_quit(0, NULL);
 }
 
 void sc_focus_input(Argument* argument){
@@ -68,13 +67,13 @@ void sc_focus_input(Argument* argument){
 void sc_focus_inputbar(Argument* argument) {
    if(argument->data) {
       char* data = argument->data;
-
       if(argument->n == APPEND_URL)
          data = g_strdup_printf("%s%s", data, webkit_web_view_get_uri(GET_CURRENT_TAB()));
       else
          data = g_strdup(data);
 
-      notify(INFO, data);
+      //notify(INFO, data);
+      gtk_entry_set_text(Client.UI.inputbar, data);
       g_free(data);
 
       /* we save the X clipboard that will be clear by "grab_focus" */
@@ -91,10 +90,7 @@ void sc_focus_inputbar(Argument* argument) {
       }
    }
 
-   if(!(GTK_WIDGET_VISIBLE(GTK_WIDGET(Client.UI.inputbar)))){
-      gtk_widget_show(GTK_WIDGET(Client.UI.inputbar));
-      gtk_widget_hide(GTK_WIDGET(Client.UI.statusbar));
-   }
+   set_inputbar_visibility(TOGGLE);
 }
 
 void sc_follow_link(Argument* argument) {
@@ -124,8 +120,10 @@ void sc_follow_link(Argument* argument) {
          cmd = g_strdup("focus_prev()");
       else
          cmd = g_strdup("focus_next()");
-   } else if(Client.Global.buffer && Client.Global.buffer->len > 0)
-      cmd = g_strconcat("update_hints(\"", Client.Global.buffer->str, "\")", NULL);
+   } else if(key){
+      char* keyval = gdk_keyval_name(key->keyval);
+      cmd = g_strdup_printf("update_hints(\"%s\")", keyval);
+   }
 
    run_script(cmd, &value, NULL);
    g_free(cmd);
@@ -231,6 +229,7 @@ void sc_navigate_tabs(Argument* argument) {
 
    gtk_notebook_set_current_page(Client.UI.webview, new_tab);
    gtk_widget_grab_focus(GTK_WIDGET(GET_CURRENT_TAB_WIDGET()));
+   //gtk_widget_grab_focus(GTK_WIDGET(GET_CURRENT_TAB()));
 
    update_client();
 }
@@ -294,7 +293,6 @@ void sc_quickmark(Argument* argument) {
 
       if(qmark->id == id) {
          open_uri(GET_CURRENT_TAB(), qmark->uri);
-         update_client();
          return;
       }
    }
@@ -312,15 +310,11 @@ void sc_reload(Argument* argument) {
 }
 
 void sc_reopen(Argument* argument) {
-   GList *last_closed = g_list_first(Client.Global.last_closed);
 
-   if(last_closed) {
-      if(argument && argument->n)
-         create_tab(last_closed->data, TRUE);
-      else
-         create_tab(last_closed->data, FALSE);
+   if(Client.Global.last_closed) {
+      create_tab(Client.Global.last_closed, FALSE);
 
-      Client.Global.last_closed = g_list_remove(Client.Global.last_closed, last_closed->data);
+      Client.Global.last_closed = NULL; 
    }
 }
 
@@ -364,39 +358,6 @@ void sc_scroll(Argument* argument) {
 
 void sc_search(Argument* argument) {
    search_and_highlight(argument);
-}
-
-void sc_toggle_proxy(Argument* argument) {
-   // TODO Properly implement this function
-   /*
-   static gboolean enable = FALSE;
-
-   if(enable) {
-      g_object_set(Client.Global.soup_session, "proxy-uri", NULL, NULL);
-
-      notify(INFO, "Proxy deactivated");
-   } else {
-      char* purl = (proxy) ? proxy : (char*) g_getenv("http_proxy");
-      if(!purl)   purl = (char*)g_getenv("HTTP_PROXY");
-
-      if(!purl) {
-         say(WARNING, "No proxy defined", -1);
-         return;
-      }
-
-      char* uri = strstr(purl, "://") ? g_strdup(purl) : g_strconcat("http://", purl, NULL);
-      SoupURI* proxy_uri = soup_uri_new(uri);
-
-      g_object_set(Client.Global.soup_session, "proxy-uri", proxy_uri, NULL);
-
-      soup_uri_free(proxy_uri);
-      g_free(uri);
-
-      notify(INFO, "Proxy activated");
-   }
-
-   enable = !enable;
-   */
 }
 
 void sc_toggle_sourcecode(Argument* argument) {
@@ -451,29 +412,40 @@ void isc_abort(Argument* argument) {
    Argument arg = { HIDE, NULL };
    isc_completion(&arg);
 
-   notify(INFO, "");
+   //notify(INFO, "");
+   gtk_label_set_text((GtkLabel*) Client.Statusbar.message, "");
+   change_mode(NORMAL);
    gtk_widget_grab_focus(GTK_WIDGET(GET_CURRENT_TAB_WIDGET()));
-   gtk_widget_hide(GTK_WIDGET(Client.UI.inputbar));
-   gtk_widget_show(GTK_WIDGET(Client.UI.statusbar));
+   //gtk_widget_grab_focus(GTK_WIDGET(GET_CURRENT_TAB()));
+   set_inputbar_visibility(HIDE);
+   //gtk_widget_hide(GTK_WIDGET(Client.UI.inputbar));
+   //if(show_statusbar) gtk_widget_show(GTK_WIDGET(Client.UI.statusbar));
 }
 
 // TODO Needs major clean up
 void isc_completion(Argument* argument) {
    gchar *input      = gtk_editable_get_chars(GTK_EDITABLE(Client.UI.inputbar), 0, -1);
-   gchar  identifier = input[0];
-   gchar *input_m    = input + 1;
-   int    length     = strlen(input_m);
-
-   if(!length && !identifier) {
+   if(strlen(input)==0) {
       g_free(input);
       return;
    }
 
-   /* get current information*/
-   char* first_space = strstr(input_m, " ");
-   char* current_command;
-   char* current_parameter;
-   int   current_command_length;
+   gchar  identifier = input[0];
+   gchar *input_m    = input + 1;
+   gint   length     = strlen(input_m);
+
+   // if the identifier does not match the command sign and
+   // the completion should not be hidden, leave this function
+   if((identifier != ':') && (argument->n != HIDE)) {
+      g_free(input);
+      return;
+   }
+
+   // get current information
+   gchar* first_space = strstr(input_m, " ");
+   gchar* current_command;
+   gchar* current_parameter;
+   gint   current_command_length;
 
    if(!first_space) {
       current_command          = input_m;
@@ -486,28 +458,21 @@ void isc_completion(Argument* argument) {
       current_parameter        = input_m + offset + 1;
    }
 
-   /* if the identifier does not match the command sign and
-    * the completion should not be hidden, leave this function */
-   if((identifier != ':') && (argument->n != HIDE)) {
-      g_free(input);
-      return;
-   }
-
-   /* static elements */
+   // static elements
    static GtkBox        *results = NULL;
    static CompletionRow *rows    = NULL;
 
-   static int current_item = 0;
-   static int n_items      = 0;
+   static gint current_item = 0;
+   static gint n_items      = 0;
 
-   static char *previous_command   = NULL;
-   static char *previous_parameter = NULL;
-   static int   previous_id        = 0;
-   static int   previous_length    = 0;
+   static gchar *previous_command   = NULL;
+   static gchar *previous_parameter = NULL;
+   static gint   previous_id        = 0;
+   static gint   previous_length    = 0;
 
    static gboolean command_mode = TRUE;
 
-   /* delete old list iff
+   /* delete old list if
     *   the completion should be hidden
     *   the current command differs from the previous one
     *   the current parameter differs from the previous one
@@ -518,15 +483,13 @@ void isc_completion(Argument* argument) {
          (previous_length != length)
      ) {
       if(results)    gtk_widget_destroy(GTK_WIDGET(results));
-
-      results = NULL;
+      results        = NULL;
 
       if(rows)       free(rows);
-
-      rows         = NULL;
-      current_item = 0;
-      n_items      = 0;
-      command_mode = TRUE;
+      rows           = NULL;
+      current_item   = 0;
+      n_items        = 0;
+      command_mode   = TRUE;
 
       if(argument->n == HIDE) {
          g_free(input);
@@ -534,12 +497,13 @@ void isc_completion(Argument* argument) {
       }
    }
 
+   //---
    /* create new list iff
     *  there is no current list
     *  the current command differs from the previous one
     *  the current parameter differs from the previous one
     */
-   if( (!results) ) {
+   if( !results ) {
       results = GTK_BOX(gtk_vbox_new(FALSE, 0));
 
       /* create list based on parameters iff
@@ -550,7 +514,6 @@ void isc_completion(Argument* argument) {
        */
       if(strchr(input_m, ' ')) {
          gboolean search_matching_command = FALSE;
-
          for(unsigned int i = 0; i < LENGTH(commands); i++) {
             int cmd_length  = commands[i].command ? strlen(commands[i].command) : 0;
 
@@ -565,7 +528,6 @@ void isc_completion(Argument* argument) {
                }
             }
          }
-
          if(!search_matching_command) {
             g_free(input);
             return;
@@ -640,10 +602,10 @@ void isc_completion(Argument* argument) {
 
    /* update coloring iff there is a list with items */
    if( (results) && (n_items > 0) ) {
-      if(!rows[current_item].is_group)
-         cr_set_color(results, NORMAL, current_item);
       char* temp;
       int i = 0, next_group = 0;
+
+      if(!rows[current_item].is_group) cr_set_color(results, NORMAL, current_item);
 
       for(i = 0; i < n_items; i++) {
          if(argument->n == NEXT || argument->n == NEXT_GROUP)
@@ -695,7 +657,7 @@ void isc_completion(Argument* argument) {
       else
          previous_length += strlen(previous_parameter) + 1;
 
-      previous_id        = rows[current_item].command_id;
+      previous_id = rows[current_item].command_id;
    }
    g_free(input);
 }

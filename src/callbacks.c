@@ -42,7 +42,6 @@ gboolean cb_destroy(GtkWidget* widget, gpointer data) {
       free(list->data);
 
    g_list_free(Client.Global.history);
-   g_list_free(Client.Global.last_closed);
 
    // clean search engines 
    for(GList* list = Client.Global.search_engines; list; list = g_list_next(list))
@@ -105,10 +104,8 @@ gboolean cb_inputbar_activate(GtkEntry* entry, gpointer data) {
    if(identifier == '/'){
       arg.n = FORWARD;
       arg.data = (char*)input+1;
-      search_item = g_strdup(arg.data);
-      search_item_changed = TRUE;
+      search_and_highlight(&arg);
 
-      //search_and_highlight(&arg);
       isc_abort(NULL);
       gtk_widget_grab_focus(GTK_WIDGET(GET_CURRENT_TAB_WIDGET()));
       g_free(input);
@@ -130,18 +127,17 @@ gboolean cb_inputbar_activate(GtkEntry* entry, gpointer data) {
       }
    }
 
-   if(retv)     isc_abort(NULL);
-   if(!succ)    notify(ERROR, "Unknown command.");
+   if(!succ) notify(ERROR, "Unknown command.");
 
-   //arg.n = HIDE;
-   //isc_completion(&arg);
-   
+   if(retv) isc_abort(NULL);
+   else     set_inputbar_visibility(HIDE); 
+
    gtk_widget_grab_focus(GTK_WIDGET(GET_CURRENT_TAB_WIDGET()));
+   //change_mode(NORMAL);
    g_strfreev(tokens);
    
    return TRUE;
 }
-
 
 gboolean cb_inputbar_kb_pressed(GtkWidget* widget, GdkEventKey* event, gpointer data) {
    guint keyval;
@@ -182,7 +178,7 @@ gboolean cb_wv_button_release_event(GtkWidget* widget, GdkEvent* event, gpointer
 }
 
 gboolean cb_wv_console_message(WebKitWebView* wv, char* message, int line, char* source, gpointer data) {
-      printf("%s\n", message);
+   say(INFO, g_strdup_printf("%s\n", message), -1);
 
    if(!strcmp(message, "hintmode_off") || !strcmp(message, "insertmode_off"))
       change_mode(NORMAL);
@@ -193,17 +189,12 @@ gboolean cb_wv_console_message(WebKitWebView* wv, char* message, int line, char*
 }
 
 GtkWidget* cb_wv_create_webview(WebKitWebView* wv, WebKitWebFrame* frame, gpointer data) {
-   char* uri = (char*) webkit_web_view_get_uri(wv);
-   GtkWidget* tab = create_tab(uri, TRUE);
-
-   return tab;
+   return create_tab((char*)webkit_web_view_get_uri(wv), TRUE);
 }
 
 gboolean cb_wv_download_request(WebKitWebView* wv, WebKitDownload* download, gpointer data) {
-   const char* filename = webkit_download_get_suggested_filename(download);
 
-   download_content(download, (char*)filename);
-
+   download_content(download, (char*)webkit_download_get_suggested_filename(download));
    return TRUE;
 }
 
@@ -240,7 +231,22 @@ gboolean cb_wv_kb_pressed(WebKitWebView *wv, GdkEventKey *event) {
 
    guint keyval;
    GdkModifierType irrelevant;
+   gdk_keymap_translate_keyboard_state(Client.Global.keymap, event->hardware_keycode,
+         event->state, event->group, &keyval, NULL, NULL, &irrelevant);
 
+   if(keyval == GDK_Escape){
+      Argument arg={0, NULL};
+      sc_abort(&arg);
+   } else if(Client.Global.mode==NORMAL && isascii(keyval))
+      change_mode(INSERT);
+
+   return FALSE;
+}
+
+gboolean cb_tab_kb_pressed(WebKitWebView *wv, GdkEventKey *event) {
+
+   guint keyval;
+   GdkModifierType irrelevant;
    gdk_keymap_translate_keyboard_state(Client.Global.keymap, event->hardware_keycode,
          event->state, event->group, &keyval, NULL, NULL, &irrelevant);
 
@@ -274,9 +280,6 @@ gboolean cb_wv_kb_pressed(WebKitWebView *wv, GdkEventKey *event) {
    }
 
    switch(Client.Global.mode) {
-      case INSERT :
-         if( keyval == GDK_Escape)
-            change_mode(NORMAL);
       case PASS_THROUGH :
          return FALSE;
       case PASS_THROUGH_NEXT :
@@ -285,7 +288,7 @@ gboolean cb_wv_kb_pressed(WebKitWebView *wv, GdkEventKey *event) {
    }
 
    // append only numbers and characters to buffer
-   if(isascii(keyval)) {
+   if(Client.Global.mode==NORMAL && isascii(keyval)) {
       if(!Client.Global.buffer)
          Client.Global.buffer = g_string_new("");
 
@@ -295,8 +298,8 @@ gboolean cb_wv_kb_pressed(WebKitWebView *wv, GdkEventKey *event) {
 
    // follow hints
    if(Client.Global.mode == FOLLOW) {
-      //Argument argument = {0, event};
-      //sc_follow_link(&argument);
+      Argument argument = {0, event};
+      sc_follow_link(&argument);
       return TRUE;
    }
    return FALSE;

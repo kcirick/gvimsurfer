@@ -1,6 +1,5 @@
 /*
  * config/binds.h
- * called by callbacks.c
  */
 
 #ifndef CONFIG_BINDS_H
@@ -9,7 +8,7 @@
 //--- Mouse buttons -----
 Mouse mouse[] = {
   // mask,             button,   function,   mode,      argument 
-  {0,                  1,        NULL,       NORMAL,    { 0,          NULL } },
+  {0,                  1,        NULL,       NORMAL,    { 0,   NULL } },
 };
 
 //--- Keyboard shortcuts -----

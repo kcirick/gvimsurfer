@@ -1,4 +1,4 @@
-VERSION = 0.1
+VERSION = 0.2
 
 TARGET	= gvimsurfer
 NAME		= gVimSurfer
@@ -9,10 +9,10 @@ CONFIG	= $(wildcard config/*.h)
 
 # libs
 GTK_INC = $(shell pkg-config --cflags gtk+-2.0 webkit-1.0 )
-GTK_LIB = $(shell pkg-config --libs gtk+-2.0 gthread-2.0 webkit-1.0 )
+GTK_LIB = $(shell pkg-config --libs gtk+-2.0 webkit-1.0 )
 
 CC = gcc
-LFLAGS = -lc ${GTK_LIB} -lpthread -lm
+LFLAGS = -lc ${GTK_LIB} -lm
 CFLAGS = -std=c99 -pedantic -Wall -I./ -I/usr/include $(GTK_INC)
 CFLAGS += -DVERSION=\"$(VERSION)\" -D_XOPEN_SOURCE=600 -DTARGET=\"$(TARGET)\" -DNAME=\"$(NAME)\"
 
