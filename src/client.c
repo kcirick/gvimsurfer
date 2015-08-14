@@ -19,6 +19,11 @@
 
 #include "config/config.h"
 
+//--- Function declarations -----
+GtkWidget * create_notebook_label(const gchar*, GtkWidget*, gint);
+void        init_client_data();
+
+
 void init_client() {
 
    Client.Global.mode         = NORMAL;
@@ -112,6 +117,7 @@ void init_client() {
    // set window size
    gtk_window_set_default_size(GTK_WINDOW(Client.UI.window), default_width, default_height);
 
+   init_client_data();
 }
 
 void init_client_data(){
@@ -200,7 +206,6 @@ GtkWidget* create_tab(char* uri, gboolean background) {
 
    GtkWidget *tab = gtk_scrolled_window_new(NULL, NULL);
    WebKitWebView *wv  = (WebKitWebView*)webkit_web_view_new();
-   if(!tab || !wv)    return NULL;
 
    int number_of_tabs = gtk_notebook_get_current_page(Client.UI.webview);
    int position       = number_of_tabs + 1;
@@ -243,13 +248,14 @@ GtkWidget* create_tab(char* uri, gboolean background) {
    char *filename, *file_url;
 
    gboolean enablePlugins = TRUE;
+   gboolean enableScripts = TRUE;
    gboolean enableJava = TRUE;
    gboolean enablePagecache = FALSE;
 
    Client.Global.soup_session = webkit_get_default_session();
    g_object_set(G_OBJECT(Client.Global.soup_session), "ssl-ca-file", ca_bundle, NULL);
    g_object_set(G_OBJECT(Client.Global.soup_session), "ssl-strict", strict_ssl, NULL);
-   g_object_set(G_OBJECT(settings), "enable-scripts", enablePlugins, NULL);
+   g_object_set(G_OBJECT(settings), "enable-scripts", enableScripts, NULL);
    g_object_set(G_OBJECT(settings), "enable-plugins", enablePlugins, NULL);
    g_object_set(G_OBJECT(settings), "enable-java-applet", enableJava, NULL);
    g_object_set(G_OBJECT(settings), "enable-page-cache", enablePagecache, NULL);
@@ -260,9 +266,11 @@ GtkWidget* create_tab(char* uri, gboolean background) {
    //g_object_get(G_OBJECT(settings), "zoom-step", &client.config.zoomstep, NULL);
    webkit_web_view_set_settings(wv, settings);
 
+   GtkWidget* label = create_notebook_label("", GTK_WIDGET(Client.UI.webview), position);
+
    gtk_container_add(GTK_CONTAINER(tab), GTK_WIDGET(wv));
    gtk_widget_show_all(tab);
-   gtk_notebook_insert_page(Client.UI.webview, tab, NULL, position);
+   gtk_notebook_insert_page(Client.UI.webview, tab, label, position);
 
    if(!background)
       gtk_notebook_set_current_page(Client.UI.webview, position);
@@ -274,6 +282,28 @@ GtkWidget* create_tab(char* uri, gboolean background) {
    change_mode(NORMAL);
 
    return GTK_WIDGET(wv);
+}
+
+GtkWidget * create_notebook_label( const gchar *text, GtkWidget *notebook, gint page) {
+
+   GtkWidget *image;
+   GtkWidget *hbox     = gtk_hbox_new(FALSE, 3);
+   GtkWidget *label    = gtk_label_new(text);
+   GtkWidget *button   = gtk_event_box_new();
+
+   g_object_set_data( G_OBJECT(button), "page", GINT_TO_POINTER(page) );
+   g_signal_connect( G_OBJECT(button), "button_press_event", G_CALLBACK(cb_button_close_tab), GTK_NOTEBOOK(notebook) );
+
+   gtk_box_pack_start(GTK_BOX(hbox),   label,  TRUE,  TRUE,    0);
+   gtk_box_pack_end(GTK_BOX(hbox),     button, FALSE, FALSE,   0);
+
+   image = gtk_image_new_from_stock (GTK_STOCK_CLOSE, GTK_ICON_SIZE_MENU);
+   gtk_event_box_set_visible_window(GTK_EVENT_BOX(button), FALSE);
+   gtk_container_add (GTK_CONTAINER(button), image);
+
+   gtk_widget_show_all( hbox );
+
+   return( hbox );
 }
 
 void close_tab(int tab_id) {
@@ -325,7 +355,7 @@ void update_client(){
 
       const gchar* tab_title = webkit_web_view_get_title(GET_WEBVIEW(tab));
       int progress = webkit_web_view_get_progress(GET_WEBVIEW(tab)) * 100;
-      gchar* n_tab_title = g_strdup_printf("[%d] %s", tc + 1, tab_title ? tab_title : ((progress == 100) ? "Loading..." : "(Untitled)"));
+      gchar* n_tab_title = g_strdup_printf("%d: %s", tc + 1, tab_title ? tab_title : ((progress == 100) ? "Loading..." : "(Untitled)"));
 
       // shorten title if needed
       gchar* new_tab_title = g_strdup_printf("%s", n_tab_title);
@@ -333,7 +363,13 @@ void update_client(){
          g_strlcpy(new_tab_title, n_tab_title, max_title_length-3);
          g_strlcat(new_tab_title, "...", max_title_length);
       }
-      gtk_notebook_set_tab_label_text(Client.UI.webview, tab, new_tab_title);
+
+      
+      GtkWidget* label = gtk_notebook_get_tab_label(Client.UI.webview, tab);
+      label = NULL;
+      label = create_notebook_label(new_tab_title, GTK_WIDGET(Client.UI.webview), tc);
+      //gtk_notebook_set_tab_label_text(Client.UI.webview, tab, new_tab_title);
+      gtk_notebook_set_tab_label(Client.UI.webview, tab, label);
       g_free(n_tab_title);
       g_free(new_tab_title);
    }
@@ -398,20 +434,15 @@ void update_statusbar_info() {
 
 void update_statusbar_uri() {
    gchar* link  = (gchar*) webkit_web_view_get_uri(GET_CURRENT_TAB());
-   gchar* uri = link?g_strdup_printf("%s", link):NULL;
+   gchar* uri = link?g_strdup_printf("%s", link):"[NULL]";
 
    /* check for https */
    gboolean ssl = link ? g_str_has_prefix(link, "https://") : FALSE;
-   GdkColor* fg;
-   if(ssl)  fg = &(Client.Style.statusbar_ssl_fg);
-   else     fg = &(Client.Style.statusbar_fg);
+   GdkColor* fg = ssl ? &(Client.Style.statusbar_ssl_fg) : &(Client.Style.statusbar_fg);
 
    gtk_widget_modify_fg(GTK_WIDGET(Client.Statusbar.uri),      GTK_STATE_NORMAL, fg);
-
-   if(!uri) uri = g_strdup("[No name]");
-
    gtk_label_set_text((GtkLabel*) Client.Statusbar.uri, uri);
-   g_free(uri);
+   //g_free(uri);
 }
 
 void set_inputbar_visibility(gint visibility){

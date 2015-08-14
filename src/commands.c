@@ -179,7 +179,7 @@ gboolean cmd_saveas(int argc, char** argv) {
       uri = argv[0];
 
    if(!uri){
-      notify(ERROR, "Could not retrieve download uri");
+      notify(ERROR, "Could not retrieve download uri", -1);
       return FALSE;
    }
    WebKitNetworkRequest* request = webkit_network_request_new(uri);
@@ -196,6 +196,7 @@ gboolean cmd_saveas(int argc, char** argv) {
    return TRUE;
 }
 
+// to become load_script
 gboolean cmd_script(int argc, char** argv) {
    if(argc < 1)    return TRUE;
 
@@ -210,33 +211,24 @@ gboolean cmd_script(int argc, char** argv) {
       g_file_get_contents(file, &content, NULL, NULL);
 
    if(!content) {
-      gchar* message = g_strdup_printf("Could not open or read file '%s'", path);
-      notify(ERROR, message);
-      g_free(message);
+      notify(ERROR, g_strdup_printf("Could not open or read file '%s'", path), -1);
       return FALSE;
    }
 
    // search for existing script to overwrite or reread it
-   GList* sl = Client.Global.scripts;
-   while(sl) {
-      Script* scr = (Script*)sl->data;
-      if(!strcmp(scr->path, path)) {
-         scr->path    = path;
-         scr->content = content;
-         return TRUE;
-      }
-      sl = g_list_next(sl);
+   Script* scr = Client.Global.user_script;
+   if(scr && !strcmp(scr->path, path)) {
+      scr->path    = path;
+      scr->content = content;
+      return TRUE;
    }
 
    // load new script
-   Script* entry = malloc(sizeof(Script));
-   if(!entry)      say(ERROR, "Out of memory", EXIT_FAILURE);
+   Client.Global.user_script = malloc(sizeof(Script));
+   if(!Client.Global.user_script) notify(ERROR, "Out of memory", EXIT_FAILURE);
 
-   entry->path    = path;
-   entry->content = content;
-
-   // append to list
-   Client.Global.scripts = g_list_append(Client.Global.scripts, entry);
+   Client.Global.user_script->path    = path;
+   Client.Global.user_script->content = content;
 
    return TRUE;
 }
@@ -244,7 +236,8 @@ gboolean cmd_script(int argc, char** argv) {
 gboolean cmd_session(int argc, char** argv) {
    if(argc<=1 || argv[argc]!=NULL)  return FALSE;
 
-   gchar* session_name   = g_strjoinv(" ", argv);
+   //gchar* session_name   = g_strjoinv(" ", argv);
+   gchar* session_name   = argv[1];
    
    gboolean to_return=FALSE;
    if(strcmp(argv[0], "save")==0)

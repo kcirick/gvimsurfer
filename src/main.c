@@ -28,10 +28,10 @@ int main(int argc, char* argv[]) {
       { NULL } };
 
    if (!gtk_init_with_args(&argc, &argv, "[URL1 URL2 ...]", opts, NULL, &err))
-      say(ERROR, err->message, EXIT_FAILURE);
+      notify(ERROR, err->message, EXIT_FAILURE);
 
    if (version)
-      say(INFO, "Version "VERSION, EXIT_SUCCESS);
+      notify(INFO, "Version "VERSION, EXIT_SUCCESS);
 
    // read config file
    gchar* configfile=NULL;
@@ -41,11 +41,10 @@ int main(int argc, char* argv[]) {
       configfile = g_build_filename(g_get_home_dir(), default_config_file, NULL);
 
    if(!read_configuration(configfile)) 
-      say(ERROR, g_strdup_printf("Invalid configuration file: %s", configfile), EXIT_FAILURE);
+      notify(ERROR, g_strdup_printf("Invalid configuration file: %s", configfile), EXIT_FAILURE);
 
-   // init client and read configuration
+   // init client 
    init_client();
-   init_client_data();
 
    // create tab 
    if(argc < 2)

@@ -17,6 +17,11 @@ A screenshot:
 
 Version Log:
 ------------
+  - 0.2 (work-in-progress):
+   - Adding close button to tabs
+   - Better support for focus during INSERT mode
+   - Fix completion method
+   - Simplify some functions
   - 0.1 (2015-08-06): A working web browser
 
 To do:

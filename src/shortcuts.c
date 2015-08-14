@@ -59,9 +59,13 @@ void sc_close_tab(Argument* argument) {
 }
 
 void sc_focus_input(Argument* argument){
-   gtk_widget_grab_focus(GTK_WIDGET(GET_CURRENT_TAB()));
+   gchar *value=NULL, *message = NULL;
+   run_script("focus_input()", &value, &message);
 
-   change_mode(INSERT);
+   if(value && strncmp(value, "INSERT", 7)==0){
+      change_mode(INSERT);
+      gtk_widget_grab_focus(GTK_WIDGET(GET_CURRENT_TAB()));
+   } 
 }
 
 void sc_focus_inputbar(Argument* argument) {
@@ -72,7 +76,6 @@ void sc_focus_inputbar(Argument* argument) {
       else
          data = g_strdup(data);
 
-      //notify(INFO, data);
       gtk_entry_set_text(Client.UI.inputbar, data);
       g_free(data);
 
@@ -386,7 +389,7 @@ void sc_yank(Argument* argument) {
       gtk_clipboard_set_text(gtk_clipboard_get(GDK_SELECTION_PRIMARY), uri, -1);
 
    gchar* message = g_strdup_printf("Yanked %s", uri);
-   notify(INFO, message);
+   notify(INFO, message, -1);
    g_free(message);
 }
 
@@ -412,51 +415,35 @@ void isc_abort(Argument* argument) {
    Argument arg = { HIDE, NULL };
    isc_completion(&arg);
 
-   //notify(INFO, "");
    gtk_label_set_text((GtkLabel*) Client.Statusbar.message, "");
    change_mode(NORMAL);
    gtk_widget_grab_focus(GTK_WIDGET(GET_CURRENT_TAB_WIDGET()));
    //gtk_widget_grab_focus(GTK_WIDGET(GET_CURRENT_TAB()));
    set_inputbar_visibility(HIDE);
-   //gtk_widget_hide(GTK_WIDGET(Client.UI.inputbar));
-   //if(show_statusbar) gtk_widget_show(GTK_WIDGET(Client.UI.statusbar));
 }
 
 // TODO Needs major clean up
 void isc_completion(Argument* argument) {
    gchar *input      = gtk_editable_get_chars(GTK_EDITABLE(Client.UI.inputbar), 0, -1);
-   if(strlen(input)==0) {
+   if(strlen(input)==0 || (input[0]!=':' && argument->n!=HIDE)) {
       g_free(input);
       return;
    }
 
-   gchar  identifier = input[0];
    gchar *input_m    = input + 1;
    gint   length     = strlen(input_m);
-
-   // if the identifier does not match the command sign and
-   // the completion should not be hidden, leave this function
-   if((identifier != ':') && (argument->n != HIDE)) {
+   if(length==0){
       g_free(input);
       return;
    }
 
    // get current information
-   gchar* first_space = strstr(input_m, " ");
-   gchar* current_command;
-   gchar* current_parameter;
-   gint   current_command_length;
+   gchar **entries = g_strsplit_set(input_m, " ", -1);
+   gint n_entries = g_strv_length(entries);
 
-   if(!first_space) {
-      current_command          = input_m;
-      current_command_length   = length;
-      current_parameter        = NULL;
-   } else {
-      int offset               = abs(input_m - first_space);
-      current_command          = g_strndup(input_m, offset);
-      current_command_length   = strlen(current_command);
-      current_parameter        = input_m + offset + 1;
-   }
+   gchar* current_command        = entries[0];
+   gint   current_command_length = strlen(current_command);
+   gchar* current_parameter      =  n_entries==1 ? NULL : entries[n_entries-1];
 
    // static elements
    static GtkBox        *results = NULL;
@@ -469,8 +456,6 @@ void isc_completion(Argument* argument) {
    static gchar *previous_parameter = NULL;
    static gint   previous_id        = 0;
    static gint   previous_length    = 0;
-
-   static gboolean command_mode = TRUE;
 
    /* delete old list if
     *   the completion should be hidden
@@ -489,7 +474,6 @@ void isc_completion(Argument* argument) {
       rows           = NULL;
       current_item   = 0;
       n_items        = 0;
-      command_mode   = TRUE;
 
       if(argument->n == HIDE) {
          g_free(input);
@@ -497,38 +481,21 @@ void isc_completion(Argument* argument) {
       }
    }
 
-   //---
-   /* create new list iff
-    *  there is no current list
-    *  the current command differs from the previous one
-    *  the current parameter differs from the previous one
-    */
+   //--- create new list -----
    if( !results ) {
       results = GTK_BOX(gtk_vbox_new(FALSE, 0));
 
-      /* create list based on parameters iff
-       *  there is a current parameter given
-       *  there is an old list with commands (or not)
-       *  the current command does not differ from the previous one
-       *  the current command has an completion function
-       */
-      if(strchr(input_m, ' ')) {
-         gboolean search_matching_command = FALSE;
+      // create list based on parameters 
+      if(n_entries>1) {
          for(unsigned int i = 0; i < LENGTH(commands); i++) {
-            int cmd_length  = commands[i].command ? strlen(commands[i].command) : 0;
+            if( g_strcmp0(current_command, commands[i].command)!=0 ) continue;
 
-            if( ((current_command_length <= cmd_length)  && !strncmp(current_command, commands[i].command, current_command_length)) ) {
-               if(commands[i].completion) {
-                  previous_command = current_command;
-                  previous_id = i;
-                  search_matching_command = TRUE;
-               } else {
-                  g_free(input);
-                  return;
-               }
-            }
-         }
-         if(!search_matching_command) {
+            if(commands[i].completion) {
+               previous_command = current_command;
+               previous_id = i;
+               break;
+            } 
+
             g_free(input);
             return;
          }
@@ -539,14 +506,11 @@ void isc_completion(Argument* argument) {
             return;
          }
 
-         command_mode               = FALSE;
-         CompletionGroup* group     = NULL;
-
          rows = malloc(sizeof(CompletionRow));
-         if(!rows) say(ERROR, "Out of memory", EXIT_FAILURE);
+         if(!rows) notify(ERROR, "Out of memory", EXIT_FAILURE);
 
          for(GList* grlist = result->groups; grlist; grlist = g_list_next(grlist)) {
-            group = (CompletionGroup*)grlist->data;
+            CompletionGroup* group = (CompletionGroup*)grlist->data;
             int group_elements = 0;
 
             for(GList* element = group->elements; element; element = g_list_next(element)) {
@@ -571,20 +535,16 @@ void isc_completion(Argument* argument) {
          // clean up
          completion_free(result);
       }
-      /* create list based on commands */
+      // create list based on commands
       else {
-         command_mode = TRUE;
 
          rows = malloc(LENGTH(commands) * sizeof(CompletionRow));
-         if(!rows)   say(ERROR, "Out of memory", EXIT_FAILURE);
+         if(!rows)   notify(ERROR, "Out of memory", EXIT_FAILURE);
 
          for(unsigned int i = 0; i < LENGTH(commands); i++) {
             int cmd_length  = commands[i].command ? strlen(commands[i].command) : 0;
 
-            /* add command to list iff
-             *  the current command would match the command
-             */
-            if( ((current_command_length <= cmd_length)  && !strncmp(current_command, commands[i].command, current_command_length)) ) {
+            if( current_command_length <= cmd_length  && !strncmp(current_command, commands[i].command, current_command_length) ) {
                rows[n_items].command     = commands[i].command;
                rows[n_items].command_id  = i;
                rows[n_items].is_group    = FALSE;
@@ -602,23 +562,22 @@ void isc_completion(Argument* argument) {
 
    /* update coloring iff there is a list with items */
    if( (results) && (n_items > 0) ) {
-      char* temp;
       int i = 0, next_group = 0;
 
       if(!rows[current_item].is_group) cr_set_color(results, NORMAL, current_item);
 
       for(i = 0; i < n_items; i++) {
-         if(argument->n == NEXT || argument->n == NEXT_GROUP)
+         if(argument->n == NEXT || argument->n == NEXT_GROUP || argument->n == SHOW)
             current_item = (current_item + n_items + 1) % n_items;
          else if(argument->n == PREVIOUS || argument->n == PREVIOUS_GROUP)
             current_item = (current_item + n_items - 1) % n_items;
 
          if(rows[current_item].is_group) {
-            if(!command_mode && (argument->n == NEXT_GROUP || argument->n == PREVIOUS_GROUP))
+            if(n_entries>1 && (argument->n == NEXT_GROUP || argument->n == PREVIOUS_GROUP))
                next_group = 1;
             continue;
          } else {
-            if(!command_mode && (next_group == 0) && (argument->n == NEXT_GROUP || argument->n == PREVIOUS_GROUP))
+            if(n_entries>1 && (next_group == 0) && (argument->n == NEXT_GROUP || argument->n == PREVIOUS_GROUP))
                continue;
             break;
          }
@@ -640,25 +599,28 @@ void isc_completion(Argument* argument) {
             gtk_widget_hide(rows[i].row);
       }
 
-      if(command_mode)
+      gchar* temp;
+      if(n_entries==1)
          temp = g_strconcat(":", rows[current_item].command, (n_items == 1) ? " "  : NULL, NULL);
-      else
-         temp = g_strconcat(":", previous_command, " ", rows[current_item].command, NULL);
+      else{
+         gchar* other_parameters = "";
+         for(i=1; i<n_entries-1; i++)
+            other_parameters = g_strconcat(" ", entries[i], NULL);
+
+         temp = g_strconcat(":", previous_command, other_parameters, " ", rows[current_item].command, NULL);
+      }
 
       gtk_entry_set_text(Client.UI.inputbar, temp);
       gtk_editable_set_position(GTK_EDITABLE(Client.UI.inputbar), -1);
       g_free(temp);
 
-      previous_command   = (command_mode) ? rows[current_item].command : current_command;
-      previous_parameter = (command_mode) ? current_parameter : rows[current_item].command;
+      previous_command   = (n_entries==1) ? rows[current_item].command : current_command;
+      previous_parameter = (n_entries==1) ? current_parameter : rows[current_item].command;
       previous_length    = strlen(previous_command);
-      if(command_mode)
-         previous_length += length - current_command_length;
-      else
-         previous_length += strlen(previous_parameter) + 1;
+      if(n_entries==1)  previous_length += length - current_command_length;
+      else              previous_length += strlen(previous_parameter) + 1;
 
       previous_id = rows[current_item].command_id;
    }
    g_free(input);
 }
-

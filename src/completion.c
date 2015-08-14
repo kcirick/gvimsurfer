@@ -25,7 +25,7 @@ void              cg_add_element(CompletionGroup*, char*);
 //--- Completion -----
 Completion* completion_init() {
    Completion *completion = malloc(sizeof(Completion));
-   if(!completion)   say(ERROR, "Out of memory", EXIT_FAILURE);
+   if(!completion)   notify(ERROR, "Out of memory", EXIT_FAILURE);
 
    completion->groups = NULL;
 
@@ -62,7 +62,7 @@ GtkEventBox* cr_create(GtkBox* results, char* command, gboolean group) {
    gtk_widget_modify_fg(GTK_WIDGET(show_command),     GTK_STATE_NORMAL, &(Client.Style.completion_fg));
    gtk_widget_modify_bg(GTK_WIDGET(row),              GTK_STATE_NORMAL, &(Client.Style.completion_bg));
    gtk_widget_modify_font(GTK_WIDGET(show_command),   Client.Style.font);
-   if(!group) gtk_widget_set_size_request(GTK_WIDGET(row),    -1, Client.Style.statusbar_height);
+   //if(!group) gtk_widget_set_size_request(GTK_WIDGET(row),    -1, Client.Style.statusbar_height);
 
    gtk_box_pack_start(GTK_BOX(col), GTK_WIDGET(show_command),     TRUE,  TRUE,  0);
    if(group) gtk_box_pack_start(GTK_BOX(col), separator, TRUE, TRUE, 0);
@@ -92,7 +92,7 @@ void cg_add_element(CompletionGroup* group, char* name) {
 
 CompletionGroup* cg_create(char* name) {
    CompletionGroup* group = malloc(sizeof(CompletionGroup));
-   if(!group)      say(ERROR, "Out of memory", EXIT_FAILURE);
+   if(!group)      notify(ERROR, "Out of memory", EXIT_FAILURE);
 
    group->value    = name;
    group->elements = NULL;

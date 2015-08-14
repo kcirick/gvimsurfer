@@ -14,7 +14,7 @@ Mouse mouse[] = {
 //--- Keyboard shortcuts -----
 #define CMASK GDK_CONTROL_MASK
 #define SMASK GDK_SHIFT_MASK
-#define CSMASKMASK (CMASK | SMASK)
+#define CSMASK (CMASK | SMASK)
 
 Shortcut shortcuts[] = {
   // mask,  regex        key,              function,            argument
@@ -78,7 +78,7 @@ InputbarShortcut inputbar_shortcuts[] = {
   {0,       GDK_Escape,        isc_abort,        { 0,           NULL } },
   {0,       GDK_Down,          isc_completion,   { NEXT,        NULL } },
   {0,       GDK_Up,            isc_completion,   { PREVIOUS,    NULL } },
-  {0,       GDK_Tab,           isc_completion,   { NEXT_GROUP,  NULL } },
+  {0,       GDK_Tab,           isc_completion,   { SHOW,        NULL } },
 };
 
 #endif

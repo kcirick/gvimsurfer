@@ -39,9 +39,9 @@ struct {
       GList       *sessions;
       GList       *history;
       gchar       *last_closed;
-      gchar       *search_handle;
       GList       *search_engines;
-      GList       *scripts;
+      gchar       *search_handle;
+      Script      *user_script;
       GdkKeymap   *keymap;
       SoupSession *soup_session;
    } Global;
@@ -56,7 +56,6 @@ struct {
 
 //--- Function declarations -----
 void        init_client();
-void        init_client_data();
 
 void        close_tab(int);
 GtkWidget*  create_tab(char*, gboolean);

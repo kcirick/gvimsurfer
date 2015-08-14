@@ -25,6 +25,13 @@
 
 gboolean cb_blank() { return TRUE; }
 
+gboolean cb_button_close_tab(GtkButton *button, GtkNotebook *notebook) {
+  gint page_id = GPOINTER_TO_INT( g_object_get_data( G_OBJECT( button ), "page" ) );
+  close_tab(page_id);
+  
+  return TRUE;
+}
+
 gboolean cb_destroy(GtkWidget* widget, gpointer data) {
    pango_font_description_free(Client.Style.font);
 
@@ -49,12 +56,6 @@ gboolean cb_destroy(GtkWidget* widget, gpointer data) {
 
    g_list_free(Client.Global.search_engines);
 
-   // clean loaded scripts 
-   for(GList* list = Client.Global.scripts; list; list = g_list_next(list))
-      free(list->data);
-
-   g_list_free(Client.Global.scripts);
-
    // clean quickmarks
    for(GList* list = Client.Global.quickmarks; list; list = g_list_next(list))
       free(list->data);
@@ -77,9 +78,9 @@ gboolean cb_download_progress(WebKitDownload* d, GParamSpec* pspec){
 
    if (status != WEBKIT_DOWNLOAD_STATUS_STARTED && status != WEBKIT_DOWNLOAD_STATUS_CREATED) {
       if (status != WEBKIT_DOWNLOAD_STATUS_FINISHED)
-         notify(ERROR, g_strdup_printf("Error while downloading %s", webkit_download_get_suggested_filename(d)));
+         notify(ERROR, g_strdup_printf("Error while downloading %s", webkit_download_get_suggested_filename(d)), -1);
       else
-         notify(INFO, g_strdup_printf("Download %s finished", webkit_download_get_suggested_filename(d)));
+         notify(INFO, g_strdup_printf("Download %s finished", webkit_download_get_suggested_filename(d)), -1);
       Client.Global.active_downloads = g_list_remove(Client.Global.active_downloads, d);
    }
    update_statusbar_info();
@@ -127,7 +128,7 @@ gboolean cb_inputbar_activate(GtkEntry* entry, gpointer data) {
       }
    }
 
-   if(!succ) notify(ERROR, "Unknown command.");
+   if(!succ) notify(ERROR, "Unknown command.", -1);
 
    if(retv) isc_abort(NULL);
    else     set_inputbar_visibility(HIDE); 
@@ -174,11 +175,25 @@ gboolean cb_wv_button_release_event(GtkWidget* widget, GdkEvent* event, gpointer
          return TRUE;
       }
    }
+
+   // Clicking editable triggers insert mode
+   WebKitHitTestResult *result;
+   WebKitHitTestResultContext context;
+
+   result = webkit_web_view_get_hit_test_result(WEBKIT_WEB_VIEW(widget), (GdkEventButton*)event);
+   g_object_get(result, "context", &context, NULL);
+
+   if (Client.Global.mode == NORMAL && event->type == GDK_BUTTON_RELEASE) {
+      if (context & WEBKIT_HIT_TEST_RESULT_CONTEXT_EDITABLE)
+         change_mode(INSERT);
+   } else if (Client.Global.mode == INSERT && event->type == GDK_BUTTON_RELEASE) {
+      if (!(context & WEBKIT_HIT_TEST_RESULT_CONTEXT_EDITABLE)) 
+         change_mode(NORMAL);
+   }
    return FALSE;
 }
 
 gboolean cb_wv_console_message(WebKitWebView* wv, char* message, int line, char* source, gpointer data) {
-   say(INFO, g_strdup_printf("%s\n", message), -1);
 
    if(!strcmp(message, "hintmode_off") || !strcmp(message, "insertmode_off"))
       change_mode(NORMAL);
@@ -196,24 +211,6 @@ gboolean cb_wv_download_request(WebKitWebView* wv, WebKitDownload* download, gpo
 
    download_content(download, (char*)webkit_download_get_suggested_filename(download));
    return TRUE;
-}
-
-gboolean cb_wv_event(GtkWidget *widget, GdkEvent *event, gpointer user_data) {
-   WebKitHitTestResult *result;
-   WebKitHitTestResultContext context;
-
-   if (Client.Global.mode == NORMAL && event->type == GDK_BUTTON_RELEASE) {
-      result = webkit_web_view_get_hit_test_result(WEBKIT_WEB_VIEW(widget), (GdkEventButton*)event);
-      g_object_get(result, "context", &context, NULL);
-      if (context & WEBKIT_HIT_TEST_RESULT_CONTEXT_EDITABLE)
-         change_mode(INSERT);
-   } else if (Client.Global.mode == INSERT && event->type == GDK_BUTTON_RELEASE) {
-      result = webkit_web_view_get_hit_test_result(WEBKIT_WEB_VIEW(widget), (GdkEventButton*)event);
-      g_object_get(result, "context", &context, NULL);
-      if (!(context & WEBKIT_HIT_TEST_RESULT_CONTEXT_EDITABLE)) 
-         change_mode(NORMAL);
-   }
-   return FALSE;
 }
 
 gboolean cb_wv_hover_link(WebKitWebView* wv, char* title, char* link, gpointer data) {
@@ -237,8 +234,16 @@ gboolean cb_wv_kb_pressed(WebKitWebView *wv, GdkEventKey *event) {
    if(keyval == GDK_Escape){
       Argument arg={0, NULL};
       sc_abort(&arg);
-   } else if(Client.Global.mode==NORMAL && isascii(keyval))
-      change_mode(INSERT);
+   } else {
+      // Check the window element (likely editable if being typed...)
+      gchar *value = NULL, *message = NULL;
+      run_script("window.getSelection().focusNode", &value, &message);
+      if (value && g_strrstr(value, "Element"))
+         change_mode(INSERT);
+
+      g_free(value);
+      g_free(message);
+   }
 
    return FALSE;
 }
@@ -351,16 +356,17 @@ gboolean cb_wv_window_object_cleared(WebKitWebView* wv, WebKitWebFrame* frame, g
    /* load all added scripts */
    JSStringRef script;
    JSValueRef exc;
-   GString *buffer = g_string_new(NULL);
+   gchar *buffer = Client.Global.user_script->content;
 
-   for (GList* l = Client.Global.scripts; l; l=g_list_next(l))
-      g_string_append(buffer, ((Script*)l->data)->content);
-
-   script = JSStringCreateWithUTF8CString(buffer->str);
+   script = JSStringCreateWithUTF8CString(buffer);
    JSEvaluateScript((JSContextRef)context, script, JSContextGetGlobalObject((JSContextRef)context), NULL, 0, &exc);
    JSStringRelease(script);
-   g_string_free(buffer, true);
-   load_all_scripts();
+
+   if(!g_object_get_data(G_OBJECT(GET_CURRENT_TAB()), "loaded_scripts")) 
+      run_script(buffer, NULL, NULL);
+
+   g_object_set_data(G_OBJECT(GET_CURRENT_TAB()), "loaded_scripts",  (gpointer) 1);
+
    return TRUE;
 }
 

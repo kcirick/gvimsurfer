@@ -23,29 +23,30 @@
 #define COLOUR_YELLOW  "\x1b[33m"
 #define COLOUR_RESET   "\x1b[0m"
 
-void say(int type, const char *message, int exit_type){
-   gchar* coloured_type;
-   if(type==ERROR)   
-      coloured_type=g_strdup_printf(COLOUR_RED "%s" COLOUR_RESET, "ERROR");
-   else if(type==WARNING)
-      coloured_type=g_strdup_printf(COLOUR_YELLOW "%s" COLOUR_RESET, "WARNING");
-   else
-      coloured_type=g_strdup_printf(COLOUR_GREEN "%s" COLOUR_RESET, "INFO");
-
-   fprintf(stderr, "%s [%s]:\t%s\n", NAME, coloured_type, message);
-   if(exit_type==EXIT_SUCCESS || exit_type==EXIT_FAILURE ) 
-      exit(exit_type);
-}
-
-void notify(int level, char* message) {
+void notify(int level, char* message, int exit_type) {
    if(!message || strlen(message) <= 0) return;
 
-   if(level==ERROR || level==WARNING)
-      gtk_widget_modify_fg(GTK_WIDGET(Client.Statusbar.message), GTK_STATE_NORMAL, &(Client.Style.notification_fg));
-   else 
-      gtk_widget_modify_fg(GTK_WIDGET(Client.Statusbar.message), GTK_STATE_NORMAL, &(Client.Style.statusbar_fg));
+   if(Client.UI.window && exit_type>-2){
+      if(level==ERROR || level==WARNING)
+         gtk_widget_modify_fg(GTK_WIDGET(Client.Statusbar.message), GTK_STATE_NORMAL, &(Client.Style.notification_fg));
+      else 
+         gtk_widget_modify_fg(GTK_WIDGET(Client.Statusbar.message), GTK_STATE_NORMAL, &(Client.Style.statusbar_fg));
 
-   gtk_label_set_text((GtkLabel*) Client.Statusbar.message, message);
+      gtk_label_set_text((GtkLabel*) Client.Statusbar.message, message);
+   } else {
+      gchar* coloured_type;
+      if(level==ERROR)   
+         coloured_type=g_strdup_printf(COLOUR_RED "%s" COLOUR_RESET, "ERROR");
+      else if(level==WARNING)
+         coloured_type=g_strdup_printf(COLOUR_YELLOW "%s" COLOUR_RESET, "WARNING");
+      else
+         coloured_type=g_strdup_printf(COLOUR_GREEN "%s" COLOUR_RESET, "INFO");
+
+      fprintf(stderr, "%s [%s]:\t%s\n", NAME, coloured_type, message);
+   }
+
+   if(exit_type==EXIT_SUCCESS || exit_type==EXIT_FAILURE ) 
+      exit(exit_type);
 }
 
 void open_uri(WebKitWebView* web_view, char* uri) {
@@ -128,13 +129,13 @@ void set_proxy(gboolean onoff) {
    if(!onoff) {
       g_object_set(Client.Global.soup_session, "proxy-uri", NULL, NULL);
 
-      notify(INFO, "Proxy deactivated");
+      notify(INFO, "Proxy deactivated", -1);
    } else {
       filename = (char*) g_getenv("http_proxy");
       if(filename==NULL)   filename = (char*) g_getenv("HTTP_PROXY");
 
       if(filename==NULL) {
-         say(WARNING, "No proxy defined", -1);
+         notify(WARNING, "No proxy defined", -1);
          return;
       }
 
@@ -146,7 +147,7 @@ void set_proxy(gboolean onoff) {
       soup_uri_free(proxy_uri);
       g_free(new);
 
-      notify(INFO, "Proxy activated");
+      notify(INFO, "Proxy activated", -1);
    }
 }
 
@@ -227,9 +228,9 @@ void download_content(WebKitDownload* download, char* filename){
 
    uint32_t size = (uint32_t)webkit_download_get_total_size(download);
    if(size>0)
-      notify(INFO, g_strdup_printf("Download %s started (expected size: %u bytes)...", filename, size));
+      notify(INFO, g_strdup_printf("Download %s started (expected size: %u bytes)...", filename, size), -1);
    else
-      notify(INFO, g_strdup_printf("Download %s started (unknown size)...", filename));
+      notify(INFO, g_strdup_printf("Download %s started (unknown size)...", filename), -1);
 
    Client.Global.active_downloads = g_list_prepend(Client.Global.active_downloads, download);
    g_signal_connect(download, "notify::progress", G_CALLBACK(cb_download_progress), NULL);
@@ -297,7 +298,7 @@ gboolean read_configuration(char* configrc) {
       if(!strcmp(id, "search_engine")){
          gchar **entries = g_strsplit_set(value, " ", -1);
          gint    num_entries = g_strv_length(entries);
-         if(num_entries !=2) say(WARNING, "Numbers of entries is not 2!", -1);
+         if(num_entries !=2) notify(WARNING, "Numbers of entries is not 2!", -1);
          
          SearchEngine* sengine = malloc(sizeof(SearchEngine));
          sengine->name = entries[0];
@@ -319,7 +320,7 @@ gboolean read_configuration(char* configrc) {
       if(!strcmp(id, "statusbar_color")){
          gchar   **colors  = g_strsplit_set(value, " ", -1);
          gint   num_colors = g_strv_length(colors);
-         if(num_colors !=5) say(WARNING, "Numbers of colors is not 5!", -1);
+         if(num_colors !=5) notify(WARNING, "Numbers of colors is not 5!", -1);
          
          gdk_color_parse(colors[0],    &(Client.Style.statusbar_bg));
          gdk_color_parse(colors[1],    &(Client.Style.statusbar_fg));
@@ -331,7 +332,7 @@ gboolean read_configuration(char* configrc) {
       if(!strcmp(id, "completion_color")){
          gchar    **colors = g_strsplit_set(value, " ", -1);
          gint   num_colors = g_strv_length(colors);
-         if(num_colors !=3) say(WARNING, "Numbers of colors is not 3!", -1);
+         if(num_colors !=3) notify(WARNING, "Numbers of colors is not 3!", -1);
          
          gdk_color_parse(colors[0],    &(Client.Style.completion_bg));
          gdk_color_parse(colors[1],    &(Client.Style.completion_fg));
@@ -342,19 +343,6 @@ gboolean read_configuration(char* configrc) {
    g_free(lines);
 
    return TRUE;
-}
-
-void load_all_scripts() {
-   int ls = (size_t) g_object_get_data(G_OBJECT(GET_CURRENT_TAB()), "loaded_scripts");
-
-   if(!ls) {
-      GList* sl = Client.Global.scripts;
-      while(sl) {
-         run_script(((Script*)sl)->content, NULL, NULL);
-         sl = g_list_next(sl);
-      }
-   }
-   g_object_set_data(G_OBJECT(GET_CURRENT_TAB()), "loaded_scripts",  (gpointer) 1);
 }
 
 gboolean search_and_highlight(Argument* argument) {
