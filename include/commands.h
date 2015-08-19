@@ -24,7 +24,7 @@ gboolean cmd_quit(int, char**);
 gboolean cmd_quitall(int, char**);
 gboolean cmd_reload(int, char**);
 gboolean cmd_saveas(int, char**);
-gboolean cmd_script(int, char**);
+gboolean cmd_load_script(int, char**);
 gboolean cmd_session(int, char**);
 gboolean cmd_stop(int, char**);
 gboolean cmd_tabopen(int, char**);

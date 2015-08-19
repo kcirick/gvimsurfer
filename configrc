@@ -10,7 +10,6 @@ statusbar_color      = #222222 #FFFFFF #33FF00 #FFFFFF #FF1212
 completion_color     = #DDDDDD #222222 #99CCFF
 
 #--- Browser settings -----
-private_browsing  = false
 full_content_zoom = false
 show_scrollbars   = false
 show_statusbar    = true
@@ -28,12 +27,11 @@ scroll_step          = 40
 
 user_agent        = Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.36
 home_page         = about:blank
-ca_bundle         = /etc/ssl/certs/ca-certificates.crt
 external_editor   = gvim
 
 #--- Directories and files -----
-download_dir   = /home/rueno/Downloads/
-config_dir     = .config/gvimsurfer
+download_dir   = ~/Downloads/
+config_dir     = ~/.config/gvimsurfer/
 bookmarks      = bookmarks
 history        = history
 cookies        = cookies
@@ -45,4 +43,4 @@ scriptfile     = hinting.js
 search_engine  = google http://google.com/search?q=%s
 search_engine  = wiki http://wikipedia.org/wiki/%s
 search_engine  = duck http://duckduckgo.com/q=%s&t=gvimsurfer
-
+search_engine  = maps http://maps.google.com/?q=%s

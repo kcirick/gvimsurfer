@@ -13,8 +13,6 @@
 #include "include/client.h"
 #include "include/utilities.h"
 #include "include/callbacks.h"
-#include "include/completion.h"
-#include "include/commands.h"
 #include "include/shortcuts.h"
 
 #include "config/config.h"
@@ -122,13 +120,10 @@ void init_client() {
 
 void init_client_data(){
    // read bookmarks
-   gchar* bookmark_file = g_build_filename(g_get_home_dir(), config_dir, bookmarks, NULL);
-   if(!bookmark_file)    return;
-
-   if(g_file_test(bookmark_file, G_FILE_TEST_IS_REGULAR)){
+   if(g_file_test(bookmarks, G_FILE_TEST_IS_REGULAR)){
       gchar* content = NULL;
 
-      if(g_file_get_contents(bookmark_file, &content, NULL, NULL)) {
+      if(g_file_get_contents(bookmarks, &content, NULL, NULL)) {
          gchar **lines = g_strsplit(content, "\n", -1);
          gint    n     = g_strv_length(lines) - 1;
 
@@ -141,16 +136,12 @@ void init_client_data(){
          g_free(lines);
       }
    }
-   g_free(bookmark_file);
 
    // read history
-   gchar* history_file = g_build_filename(g_get_home_dir(), config_dir, history, NULL);
-   if(!history_file)     return;
-
-   if(g_file_test(history_file, G_FILE_TEST_IS_REGULAR)) {
+   if(g_file_test(history, G_FILE_TEST_IS_REGULAR)) {
       gchar* content = NULL;
 
-      if(g_file_get_contents(history_file, &content, NULL, NULL)) {
+      if(g_file_get_contents(history, &content, NULL, NULL)) {
          gchar **lines = g_strsplit(content, "\n", -1);
          gint    n     = g_strv_length(lines) - 1;
 
@@ -165,16 +156,12 @@ void init_client_data(){
          g_free(lines);
       }
    }
-   g_free(history_file);
 
    // read sessions
-   gchar* sessions_file = g_build_filename(g_get_home_dir(), config_dir, sessions, NULL);
-   if(!sessions_file)    return;
-
-   if(g_file_test(sessions_file, G_FILE_TEST_IS_REGULAR)) {
+   if(g_file_test(sessions, G_FILE_TEST_IS_REGULAR)) {
       gchar* content = NULL;
 
-      if(g_file_get_contents(sessions_file, &content, NULL, NULL)) {
+      if(g_file_get_contents(sessions, &content, NULL, NULL)) {
          gchar **lines = g_strsplit(content, "\n", -1);
          gint    n     = g_strv_length(lines) - 1;
 
@@ -191,18 +178,14 @@ void init_client_data(){
          g_free(lines);
       }
    }
-   g_free(sessions_file);
 
    // load cookies
-   gchar* cookie_file       = g_build_filename(g_get_home_dir(), config_dir, cookies, NULL);
-   SoupCookieJar *cookiejar = soup_cookie_jar_text_new(cookie_file, FALSE);
-
+   SoupCookieJar *cookiejar = soup_cookie_jar_text_new(cookies, FALSE);
    soup_session_add_feature(Client.Global.soup_session, (SoupSessionFeature*) cookiejar);
-   g_free(cookie_file);
 }
 
 GtkWidget* create_tab(char* uri, gboolean background) {
-   if(!uri)           uri = home_page;
+   if(!uri) uri = home_page;
 
    GtkWidget *tab = gtk_scrolled_window_new(NULL, NULL);
    WebKitWebView *wv  = (WebKitWebView*)webkit_web_view_new();
@@ -219,19 +202,21 @@ GtkWidget* create_tab(char* uri, gboolean background) {
       gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(tab), GTK_POLICY_NEVER, GTK_POLICY_NEVER);
    }
 
-   /* connect webview callbacks */
-   g_signal_connect(G_OBJECT(wv),  "console-message",                      G_CALLBACK(cb_wv_console_message),            NULL);
-   g_signal_connect(G_OBJECT(wv),  "create-web-view",                      G_CALLBACK(cb_wv_create_webview),          NULL);
-   g_signal_connect(G_OBJECT(wv),  "download-requested",                   G_CALLBACK(cb_wv_download_request),         NULL);
-   g_signal_connect(G_OBJECT(wv),  "button-release-event",                 G_CALLBACK(cb_wv_button_release_event),     NULL);
-   g_signal_connect(G_OBJECT(wv),  "hovering-over-link",                   G_CALLBACK(cb_wv_hover_link),               NULL);
-   g_signal_connect(G_OBJECT(wv),  "mime-type-policy-decision-requested",  G_CALLBACK(cb_wv_mimetype_policy_decision), NULL);
-   g_signal_connect(G_OBJECT(wv),  "navigation-policy-decision-requested", G_CALLBACK(cb_wv_nav_policy_decision),      NULL);
-   g_signal_connect(G_OBJECT(wv),  "new-window-policy-decision-requested", G_CALLBACK(cb_wv_window_policy_decision),   NULL);
-   g_signal_connect(G_OBJECT(wv),  "notify::progress",                     G_CALLBACK(cb_wv_notify_progress),          NULL);
-   g_signal_connect(G_OBJECT(wv),  "notify::title",                        G_CALLBACK(cb_wv_notify_title),             NULL);
-   g_signal_connect(G_OBJECT(wv),  "window-object-cleared",                G_CALLBACK(cb_wv_window_object_cleared),    NULL);
-   g_signal_connect(G_OBJECT(wv),  "key-press-event",                      G_CALLBACK(cb_wv_kb_pressed),               NULL);
+   //--- connect webview callbacks -----
+   g_object_connect(G_OBJECT(wv),
+         "signal::button-release-event",                 G_CALLBACK(cb_wv_button_release),   NULL,
+         "signal::console-message",                      G_CALLBACK(cb_wv_console_message),  NULL,
+         "signal::create-web-view",                      G_CALLBACK(cb_wv_create_webview),   NULL,
+         "signal::download-requested",                   G_CALLBACK(cb_wv_download_request), NULL,
+         "signal::hovering-over-link",                   G_CALLBACK(cb_wv_hover_link),       NULL,
+         "signal::key-press-event",                      G_CALLBACK(cb_wv_kb_pressed),       NULL,
+         "signal::load-committed",                       G_CALLBACK(cb_wv_load_committed),   NULL,
+         "signal::load-progress-changed",                G_CALLBACK(cb_wv_notify_progress),  NULL,
+         "signal::mime-type-policy-decision-requested",  G_CALLBACK(cb_wv_mime_type),        NULL,
+         "signal::navigation-policy-decision-requested", G_CALLBACK(cb_wv_navigation),       NULL,
+         "signal::new-window-policy-decision-requested", G_CALLBACK(cb_wv_new_window),       NULL,
+         "signal::title-changed",                        G_CALLBACK(cb_wv_notify_title),     NULL,
+         NULL);
 
    // connect tab callbacks
    GtkAdjustment* adjustment = gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(tab));
@@ -239,31 +224,27 @@ GtkWidget* create_tab(char* uri, gboolean background) {
    g_signal_connect(G_OBJECT(adjustment), "value-changed",   G_CALLBACK(cb_wv_scrolled),    NULL);
 
    /* set default values */
-   g_object_set_data(G_OBJECT(wv), "loaded_scripts", 0);
    g_object_set(G_OBJECT(wv), "full-content-zoom", full_content_zoom, NULL);
 
    /////
    /* apply browser setting */
    WebKitWebSettings *settings = (WebKitWebSettings*)webkit_web_settings_new();
-   char *filename, *file_url;
 
+   gchar *file_url = g_strconcat("file://", stylesheet, NULL);
    gboolean enablePlugins = TRUE;
    gboolean enableScripts = TRUE;
    gboolean enableJava = TRUE;
    gboolean enablePagecache = FALSE;
 
    Client.Global.soup_session = webkit_get_default_session();
-   g_object_set(G_OBJECT(Client.Global.soup_session), "ssl-ca-file", ca_bundle, NULL);
+   g_object_set(G_OBJECT(Client.Global.soup_session), "ssl-use-system-ca-file", TRUE, NULL);
    g_object_set(G_OBJECT(Client.Global.soup_session), "ssl-strict", strict_ssl, NULL);
    g_object_set(G_OBJECT(settings), "enable-scripts", enableScripts, NULL);
    g_object_set(G_OBJECT(settings), "enable-plugins", enablePlugins, NULL);
    g_object_set(G_OBJECT(settings), "enable-java-applet", enableJava, NULL);
    g_object_set(G_OBJECT(settings), "enable-page-cache", enablePagecache, NULL);
-   filename = g_build_filename(g_get_home_dir(), config_dir, stylesheet, NULL);    
-   file_url = g_strdup_printf("file://%s", filename);
    g_object_set(G_OBJECT(settings), "user-stylesheet-uri", file_url, NULL);
    g_object_set(G_OBJECT(settings), "user-agent", user_agent, NULL);
-   //g_object_get(G_OBJECT(settings), "zoom-step", &client.config.zoomstep, NULL);
    webkit_web_view_set_settings(wv, settings);
 
    GtkWidget* label = create_notebook_label("", GTK_WIDGET(Client.UI.webview), position);
@@ -364,9 +345,7 @@ void update_client(){
          g_strlcat(new_tab_title, "...", max_title_length);
       }
 
-      
       GtkWidget* label = gtk_notebook_get_tab_label(Client.UI.webview, tab);
-      label = NULL;
       label = create_notebook_label(new_tab_title, GTK_WIDGET(Client.UI.webview), tc);
       //gtk_notebook_set_tab_label_text(Client.UI.webview, tab, new_tab_title);
       gtk_notebook_set_tab_label(Client.UI.webview, tab, label);

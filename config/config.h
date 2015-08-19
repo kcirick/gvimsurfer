@@ -10,7 +10,6 @@ gint   default_width;
 gint   default_height;
 gint   max_title_length;
 
-gboolean private_browsing;
 gboolean full_content_zoom;
 gboolean show_scrollbars;
 gboolean show_statusbar;
@@ -20,7 +19,6 @@ gboolean strict_ssl;
 gchar* user_agent;
 gchar* home_page;
 gchar* external_editor;
-gchar* ca_bundle;
 
 gint n_completion_items;
 gint history_limit;

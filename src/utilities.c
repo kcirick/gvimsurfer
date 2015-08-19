@@ -14,7 +14,6 @@
 #include "include/client.h"
 #include "include/callbacks.h"
 #include "include/completion.h"
-#include "include/commands.h"
 
 #include "config/config.h"
 
@@ -23,17 +22,23 @@
 #define COLOUR_YELLOW  "\x1b[33m"
 #define COLOUR_RESET   "\x1b[0m"
 
-void notify(int level, char* message, int exit_type) {
+//--- Function declaration -----
+char* reference_to_string(JSContextRef, JSValueRef);
+
+
+void notify(gint level, gchar* message, gboolean output_stderr, gint exit_type) {
    if(!message || strlen(message) <= 0) return;
 
-   if(Client.UI.window && exit_type>-2){
+   if(Client.UI.window){
       if(level==ERROR || level==WARNING)
          gtk_widget_modify_fg(GTK_WIDGET(Client.Statusbar.message), GTK_STATE_NORMAL, &(Client.Style.notification_fg));
       else 
          gtk_widget_modify_fg(GTK_WIDGET(Client.Statusbar.message), GTK_STATE_NORMAL, &(Client.Style.statusbar_fg));
 
       gtk_label_set_text((GtkLabel*) Client.Statusbar.message, message);
-   } else {
+   }
+
+   if(!Client.UI.window || output_stderr){
       gchar* coloured_type;
       if(level==ERROR)   
          coloured_type=g_strdup_printf(COLOUR_RED "%s" COLOUR_RESET, "ERROR");
@@ -49,62 +54,49 @@ void notify(int level, char* message, int exit_type) {
       exit(exit_type);
 }
 
-void open_uri(WebKitWebView* web_view, char* uri) {
-   if(!uri)              return;
-   while (*uri == ' ')   uri++;
+void open_uri(WebKitWebView* web_view, gchar* uri) {
+   if(!uri) return;
 
    gchar* new_uri = NULL;
 
-   char* uri_first_space = strchr(uri, ' ');
-   if(uri_first_space) {   // multiple argument given
-      unsigned int first_arg_length = uri_first_space - uri;
+   gchar **args = g_strsplit(uri, " ", -1);
+   gint   nargs = g_strv_length(args);
+
+   if(nargs==1){  // only one argument given
+
+      // file path
+      if(uri[0] == '/' || strncmp(uri, "./", 2) == 0) 
+         new_uri = g_strconcat("file://", uri, NULL);
+      // uri does contain any ".", ":" or "/" nor does it start with "localhost"
+      else if(!strpbrk(uri, ".:/") && strncmp(uri, "localhost", 9))
+         new_uri = g_strconcat("http://", uri, NULL);
+      else
+         new_uri = strstr(uri, "://") ? g_strdup(uri) : g_strconcat("http://", uri, NULL);
+   
+   } else {       // multiple arguments given
 
       /* first agrument contain "://" -> it's a bookmark with tag */
-      if(strstr(uri, "://")) {
-         new_uri = g_strndup(uri, first_arg_length);
+      if(g_strrstr(args[0], "://")) {
+         new_uri = g_strdup(args[0]);
       }
       /* first agrument doesn't contain "://" -> use search engine */
       else {
          SearchEngine* se;
          for(GList* list = Client.Global.search_engines; list; list = g_list_next(list)){
             se = (SearchEngine*)list->data;
-            if(strlen(se->name) == first_arg_length && !strncmp(uri, se->name, first_arg_length)){
-               break;
-            }
+            if(g_strcmp0(args[0], se->name)==0) break;
          }
 
-         if(!se)
-            se = (SearchEngine*)g_list_first(Client.Global.search_engines)->data;
-         else /* we remove the trailing arg since it's the se name */
-            uri = uri + first_arg_length + 1;
+         if(!se){
+            notify(WARNING, g_strdup_printf("Search engine %s doesn't exist", args[0]), FALSE, -1);
+            return;
+         } else 
+            uri = g_strjoinv(" ", &args[1]);
 
          new_uri = g_strdup_printf(se->uri, uri);
-
-         printf("%s\n", new_uri);
-         /* we change all the space with '+'
-          * -2 for the '%s'
-          */
-         char* new_uri_it = new_uri + strlen(se->uri) - 2;
-
-         while(*new_uri_it) {
-            if(*new_uri_it == ' ') *new_uri_it = '+';
-
-            new_uri_it++;
-         }
       }
-   } else if(strlen(uri) == 0) {   // no argument given
-      new_uri = g_strdup(home_page);
-   } else {                        // only one argument given
-      // file path
-      if(uri[0] == '/' || strncmp(uri, "./", 2) == 0) {
-         new_uri = g_strconcat("file://", uri, NULL);
-      }
-      // uri does contain any ".", ":" or "/" nor does it start with "localhost"
-      else if(!strpbrk(uri, ".:/") && strncmp(uri, "localhost", 9)) {
-         new_uri = g_strconcat("http://", uri, NULL);
-      } else
-         new_uri = strstr(uri, "://") ? g_strdup(uri) : g_strconcat("http://", uri, NULL);
-   }
+
+   } 
    webkit_web_view_load_uri(web_view, new_uri);
 
    // update history
@@ -118,6 +110,7 @@ void open_uri(WebKitWebView* web_view, char* uri) {
       } else 
          Client.Global.history = g_list_prepend(Client.Global.history, g_strdup(new_uri));
    }
+   g_free(args);
    g_free(new_uri);
 
    update_client();
@@ -129,13 +122,13 @@ void set_proxy(gboolean onoff) {
    if(!onoff) {
       g_object_set(Client.Global.soup_session, "proxy-uri", NULL, NULL);
 
-      notify(INFO, "Proxy deactivated", -1);
+      notify(INFO, "Proxy deactivated", FALSE, -1);
    } else {
       filename = (char*) g_getenv("http_proxy");
       if(filename==NULL)   filename = (char*) g_getenv("HTTP_PROXY");
 
       if(filename==NULL) {
-         notify(WARNING, "No proxy defined", -1);
+         notify(WARNING, "No proxy defined", FALSE, -1);
          return;
       }
 
@@ -147,7 +140,7 @@ void set_proxy(gboolean onoff) {
       soup_uri_free(proxy_uri);
       g_free(new);
 
-      notify(INFO, "Proxy activated", -1);
+      notify(INFO, "Proxy activated", FALSE, -1);
    }
 }
 
@@ -173,7 +166,6 @@ void change_mode(int mode) {
       default:
          mode_text = "";
          mode      = NORMAL;
-         //gtk_widget_grab_focus(GTK_WIDGET(GET_CURRENT_TAB()));
          gtk_widget_grab_focus(GTK_WIDGET(GET_CURRENT_TAB_WIDGET()));
          break;
    }
@@ -199,38 +191,34 @@ void run_script(char* script, char** value, char** error) {
    WebKitWebFrame *frame = webkit_web_view_get_main_frame(GET_CURRENT_TAB());
    if(!frame)      return;
 
-   JSContextRef context  = webkit_web_frame_get_global_context(frame);
-   JSStringRef sc        = JSStringCreateWithUTF8CString(script);
+   JSGlobalContextRef context = webkit_web_frame_get_global_context(frame);
+   JSStringRef sc             = JSStringCreateWithUTF8CString(script);
    if(!context || !sc)      return;
 
-   JSObjectRef ob = JSContextGetGlobalObject(context);
-   if(!ob)      return;
-
-   JSValueRef exception = NULL;
-   JSValueRef va   = JSEvaluateScript(context, sc, ob, NULL, 0, &exception);
+   JSValueRef exception, val; 
+   val = JSEvaluateScript(context, sc, JSContextGetGlobalObject(context), NULL, 0, &exception);
    JSStringRelease(sc);
 
-   if(!va && error)
+   if(!val && error)
       *error = reference_to_string(context, exception);
    else if(value)
-      *value = reference_to_string(context, va);
+      *value = reference_to_string(context, val);
 }
 
 void download_content(WebKitDownload* download, char* filename){
 
    WebKitDownloadStatus status;
 
-   gchar* file      = g_build_filename(g_strdup(download_dir), filename ? filename : "vimsurfer_download", NULL);
-   gchar* download_path_uri = g_strconcat("file://", file, NULL);
+   gchar* download_path_uri   = g_strconcat("file://", download_dir, filename?filename:"download", NULL);
 
    webkit_download_set_destination_uri(download, download_path_uri);
    g_free(download_path_uri);
 
    uint32_t size = (uint32_t)webkit_download_get_total_size(download);
    if(size>0)
-      notify(INFO, g_strdup_printf("Download %s started (expected size: %u bytes)...", filename, size), -1);
+      notify(INFO, g_strdup_printf("Download %s started (expected size: %u bytes)...", filename, size), FALSE, -1);
    else
-      notify(INFO, g_strdup_printf("Download %s started (unknown size)...", filename), -1);
+      notify(INFO, g_strdup_printf("Download %s started (unknown size)...", filename), FALSE, -1);
 
    Client.Global.active_downloads = g_list_prepend(Client.Global.active_downloads, download);
    g_signal_connect(download, "notify::progress", G_CALLBACK(cb_download_progress), NULL);
@@ -239,12 +227,22 @@ void download_content(WebKitDownload* download, char* filename){
    status = webkit_download_get_status(download);
    if(status == WEBKIT_DOWNLOAD_STATUS_CREATED)
       webkit_download_start(download);
-
-   g_free(file);
-
 }
 
-gboolean read_configuration(char* configrc) {
+gchar* build_proper_path(gchar* path){
+
+   gchar* proper_path;
+   if(path[0]=='~')        proper_path = g_build_filename(g_get_home_dir(), path+1, NULL);
+   else if(path[0]=='/')   proper_path = g_strdup(path);
+   else {
+      notify(WARNING, g_strdup_printf("Path %s is vague", path), FALSE, -1);
+      proper_path = g_strdup(path);
+   }
+
+   return proper_path;
+}
+
+gboolean read_configuration(gchar* configrc) {
    if(!configrc) return FALSE;
    if(!g_file_test(configrc, G_FILE_TEST_IS_REGULAR)) return FALSE;
 
@@ -269,7 +267,6 @@ gboolean read_configuration(char* configrc) {
       if(!strcmp(id, "default_height"))   default_height = atoi(value);
       if(!strcmp(id, "max_title_length")) max_title_length = atoi(value);
 
-      if(!strcmp(id, "private_browsing"))    private_browsing = strcmp(value, "false") ? TRUE : FALSE;
       if(!strcmp(id, "full_content_zoom"))   full_content_zoom = strcmp(value, "false") ? TRUE : FALSE;
       if(!strcmp(id, "show_scrollbars"))     show_scrollbars = strcmp(value, "false") ? TRUE : FALSE;
       if(!strcmp(id, "show_statusbar"))      show_statusbar = strcmp(value, "false") ? TRUE : FALSE;
@@ -279,26 +276,26 @@ gboolean read_configuration(char* configrc) {
       if(!strcmp(id, "home_page"))        home_page = value;
       if(!strcmp(id, "user_agent"))       user_agent = value;
       if(!strcmp(id, "external_editor"))  external_editor = value;
-      if(!strcmp(id, "ca_bundle"))        ca_bundle = value;
 
       if(!strcmp(id, "n_completion_items"))    n_completion_items = atoi(value);
       if(!strcmp(id, "history_limit"))         history_limit = atoi(value);
       if(!strcmp(id, "zoom_step"))             zoom_step = atof(value);
       if(!strcmp(id, "scroll_step"))           scroll_step = atof(value);
 
-      if(!strcmp(id, "download_dir")) download_dir = value;
-      if(!strcmp(id, "config_dir"))   config_dir = value;
-      if(!strcmp(id, "bookmarks"))    bookmarks = value;
-      if(!strcmp(id, "history"))      history = value;
-      if(!strcmp(id, "cookies"))      cookies = value;
-      if(!strcmp(id, "sessions"))     sessions = value;
-      if(!strcmp(id, "stylesheet"))   stylesheet = value;
+      if(!strcmp(id, "download_dir")) download_dir = build_proper_path(value);
+      if(!strcmp(id, "config_dir"))   config_dir   = build_proper_path(value);
+      if(!strcmp(id, "bookmarks"))    bookmarks    = g_strconcat(config_dir, value, NULL);
+      if(!strcmp(id, "history"))      history      = g_strconcat(config_dir, value, NULL);
+      if(!strcmp(id, "cookies"))      cookies      = g_strconcat(config_dir, value, NULL);
+      if(!strcmp(id, "sessions"))     sessions     = g_strconcat(config_dir, value, NULL);
+      if(!strcmp(id, "stylesheet"))   stylesheet   = g_strconcat(config_dir, value, NULL);
+      if(!strcmp(id, "scriptfile"))   load_script(g_strconcat(config_dir, value, NULL));
 
       // Search Engines
       if(!strcmp(id, "search_engine")){
          gchar **entries = g_strsplit_set(value, " ", -1);
          gint    num_entries = g_strv_length(entries);
-         if(num_entries !=2) notify(WARNING, "Numbers of entries is not 2!", -1);
+         if(num_entries !=2) notify(WARNING, "Numbers of entries is not 2!", TRUE, -1);
          
          SearchEngine* sengine = malloc(sizeof(SearchEngine));
          sengine->name = entries[0];
@@ -308,19 +305,13 @@ gboolean read_configuration(char* configrc) {
          g_free(entries);
       }
 
-      // Loading Scripts
-      if(!strcmp(id, "scriptfile")){
-         char* my_argv[1] = { g_strdup_printf("~/%s/%s", config_dir, value) };
-         cmd_script(1, my_argv);
-      }
-
       // Appearance
       if(!strcmp(id, "font"))   
          Client.Style.font = pango_font_description_from_string(value);
       if(!strcmp(id, "statusbar_color")){
          gchar   **colors  = g_strsplit_set(value, " ", -1);
          gint   num_colors = g_strv_length(colors);
-         if(num_colors !=5) notify(WARNING, "Numbers of colors is not 5!", -1);
+         if(num_colors !=5) notify(WARNING, "Numbers of colors is not 5!", TRUE, -1);
          
          gdk_color_parse(colors[0],    &(Client.Style.statusbar_bg));
          gdk_color_parse(colors[1],    &(Client.Style.statusbar_fg));
@@ -332,7 +323,7 @@ gboolean read_configuration(char* configrc) {
       if(!strcmp(id, "completion_color")){
          gchar    **colors = g_strsplit_set(value, " ", -1);
          gint   num_colors = g_strv_length(colors);
-         if(num_colors !=3) notify(WARNING, "Numbers of colors is not 3!", -1);
+         if(num_colors !=3) notify(WARNING, "Numbers of colors is not 3!", TRUE, -1);
          
          gdk_color_parse(colors[0],    &(Client.Style.completion_bg));
          gdk_color_parse(colors[1],    &(Client.Style.completion_fg));
@@ -341,6 +332,35 @@ gboolean read_configuration(char* configrc) {
       }
    }
    g_free(lines);
+
+   return TRUE;
+}
+
+gboolean load_script(gchar* path){
+
+   gchar* file = build_proper_path(path);
+   if(!g_file_test(file, G_FILE_TEST_IS_REGULAR)) return FALSE;
+
+   char* content = NULL;
+   if(!g_file_get_contents(file, &content, NULL, NULL)){
+      notify(ERROR, g_strdup_printf("Could not open or read file '%s'", path), TRUE, -1);
+      return FALSE;
+   }
+
+   // search for existing script to overwrite or reread it
+   Script* scr = Client.Global.user_script;
+   if(scr && !strcmp(scr->path, path)) {
+      scr->path    = path;
+      scr->content = content;
+      return TRUE;
+   }
+
+   // load new script
+   Client.Global.user_script = malloc(sizeof(Script));
+   if(!Client.Global.user_script) notify(ERROR, "Out of memory", TRUE, EXIT_FAILURE);
+
+   Client.Global.user_script->path    = path;
+   Client.Global.user_script->content = content;
 
    return TRUE;
 }
@@ -374,6 +394,15 @@ gboolean search_and_highlight(Argument* argument) {
    webkit_web_view_search_text(current_wv, Client.Global.search_handle, FALSE, direction, TRUE);
 
    return FALSE;
+}
+
+void abort_input() {
+   run_completion(HIDE);
+
+   gtk_label_set_text((GtkLabel*) Client.Statusbar.message, "");
+   change_mode(NORMAL);
+   gtk_widget_grab_focus(GTK_WIDGET(GET_CURRENT_TAB_WIDGET()));
+   set_inputbar_visibility(HIDE);
 }
 
 gboolean sessionsave(char* session_name) {
@@ -434,5 +463,4 @@ gboolean sessionload(char* session_name) {
 
    return FALSE;
 }
-
 

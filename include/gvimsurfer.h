@@ -8,6 +8,7 @@
 //--- Macros -----
 #define LENGTH(x) sizeof(x)/sizeof((x)[0])
 #define ALL_MASK (GDK_CONTROL_MASK | GDK_SHIFT_MASK | GDK_MOD1_MASK)
+
 #define GET_CURRENT_TAB_WIDGET() GET_NTH_TAB_WIDGET(gtk_notebook_get_current_page(Client.UI.webview))
 #define GET_NTH_TAB_WIDGET(n) GTK_SCROLLED_WINDOW(gtk_notebook_get_nth_page(Client.UI.webview, n))
 #define GET_CURRENT_TAB() GET_NTH_TAB(gtk_notebook_get_current_page(Client.UI.webview))
@@ -77,5 +78,8 @@ typedef struct {
    gint     id;
    gchar*   uri;
 } QMark;
+
+//--- variables -----
+gboolean private_browsing;
 
 #endif

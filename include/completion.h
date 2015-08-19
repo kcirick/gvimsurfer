@@ -21,19 +21,12 @@ typedef struct {
    GtkWidget*  row;
 } CompletionRow;
 
-
-// Completion 
-Completion*       completion_init();
-void              completion_free(Completion*);
-
-// Completion Row
-GtkEventBox*      cr_create(GtkBox*, char*, gboolean);
-void              cr_set_color(GtkBox*, int, int);
-
 // Completion Command
 Completion*       cc_open(char*);
 Completion*       cc_session(char*);
 Completion*       cc_settings(char*);
+
+void run_completion(gint);
 
 #endif
 

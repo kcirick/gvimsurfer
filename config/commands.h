@@ -21,7 +21,7 @@ static const Command commands[] = {
   {"qall",     cmd_quitall,      0 },              // Quit all tabs
   {"reload",   cmd_reload,       0 },              // Reload current page
   {"saveas",   cmd_saveas,       0 },              // Save current document to disk
-  {"script",   cmd_script,       0 },              // Load a javascript file
+  {"script",   cmd_load_script,  0 },              // Load a javascript file
   {"session",  cmd_session,      cc_session },     // Save session with specified name
   {"set",      cmd_settings,     cc_settings },    // Set an option
   {"stop",     cmd_stop,         0 },              // Stop loading the current page

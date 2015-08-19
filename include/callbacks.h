@@ -14,19 +14,19 @@ gboolean    cb_button_close_tab(GtkButton*, GtkNotebook*);
 gboolean    cb_inputbar_activate(GtkEntry*, gpointer);
 gboolean    cb_inputbar_kb_pressed(GtkWidget*, GdkEventKey*, gpointer);
 
-gboolean    cb_wv_button_release_event(GtkWidget*, GdkEvent*, gpointer);
+gboolean    cb_wv_button_release(GtkWidget*, GdkEvent*, gpointer);
 gboolean    cb_wv_console_message(WebKitWebView*, char*, int, char*, gpointer);
 GtkWidget*  cb_wv_create_webview(WebKitWebView*, WebKitWebFrame*, gpointer);
 gboolean    cb_wv_download_request(WebKitWebView*, WebKitDownload*, gpointer);
 gboolean    cb_wv_hover_link(WebKitWebView*, char*, char*, gpointer);
 gboolean    cb_wv_kb_pressed(WebKitWebView*, GdkEventKey*); 
 gboolean    cb_tab_kb_pressed(WebKitWebView*, GdkEventKey*); 
-gboolean    cb_wv_mimetype_policy_decision(WebKitWebView*, WebKitWebFrame*, WebKitNetworkRequest*, char*, WebKitWebPolicyDecision*, gpointer);
-gboolean    cb_wv_nav_policy_decision(WebKitWebView*, WebKitWebFrame*, WebKitNetworkRequest*, WebKitWebNavigationAction*, WebKitWebPolicyDecision*, gpointer);
+gboolean    cb_wv_mime_type(WebKitWebView*, WebKitWebFrame*, WebKitNetworkRequest*, char*, WebKitWebPolicyDecision*, gpointer);
+gboolean    cb_wv_navigation(WebKitWebView*, WebKitWebFrame*, WebKitNetworkRequest*, WebKitWebNavigationAction*, WebKitWebPolicyDecision*, gpointer);
 gboolean    cb_wv_notify_progress(WebKitWebView*, GParamSpec*, gpointer);
 gboolean    cb_wv_notify_title(WebKitWebView*, GParamSpec*, gpointer);
-gboolean    cb_wv_window_object_cleared(WebKitWebView*, WebKitWebFrame*, gpointer, gpointer, gpointer);
-gboolean    cb_wv_window_policy_decision(WebKitWebView*, WebKitWebFrame*, WebKitNetworkRequest*, WebKitWebNavigationAction*, WebKitWebPolicyDecision*, gpointer);
+gboolean    cb_wv_new_window(WebKitWebView*, WebKitWebFrame*, WebKitNetworkRequest*, WebKitWebNavigationAction*, WebKitWebPolicyDecision*, gpointer);
 gboolean    cb_wv_scrolled(GtkAdjustment*, gpointer);
+gboolean    cb_wv_load_committed(WebKitWebView*, WebKitWebFrame*, gpointer);
 
 #endif

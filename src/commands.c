@@ -34,16 +34,12 @@ gboolean cmd_bookmark(int argc, char** argv) {
    unsigned int bookmark_length = strlen(bookmark);
    for(GList* l = Client.Global.bookmarks; l; l = g_list_next(l)) {
       if(!strncmp(bookmark, (char*) l->data, bookmark_length)) {
-         /* we remove the former bookmark so tags will be updated by the new ones */
          g_free(l->data);
          Client.Global.bookmarks = g_list_delete_link(Client.Global.bookmarks, l);
          break;
       }
    }
 
-   /* if there is tags we add it to the bookmark string
-    * -> append it to the bookmark
-    */
    if(argc >= 1 && argv[argc] == NULL) {
       char* tags = g_strjoinv(" ", argv);
       char* bookmark_temp = bookmark;
@@ -179,7 +175,7 @@ gboolean cmd_saveas(int argc, char** argv) {
       uri = argv[0];
 
    if(!uri){
-      notify(ERROR, "Could not retrieve download uri", -1);
+      notify(ERROR, "Could not retrieve download uri", TRUE, -1);
       return FALSE;
    }
    WebKitNetworkRequest* request = webkit_network_request_new(uri);
@@ -196,47 +192,15 @@ gboolean cmd_saveas(int argc, char** argv) {
    return TRUE;
 }
 
-// to become load_script
-gboolean cmd_script(int argc, char** argv) {
+gboolean cmd_load_script(int argc, char** argv) {
    if(argc < 1)    return TRUE;
 
-   char* path    = argv[0];
-   char* content = NULL;
-
-   gchar* file;
-   if(path[0] == '~')   file = g_build_filename(g_get_home_dir(), path + 1, NULL);
-   else                 file = g_strdup(path);
-
-   if(g_file_test(file, G_FILE_TEST_IS_REGULAR))
-      g_file_get_contents(file, &content, NULL, NULL);
-
-   if(!content) {
-      notify(ERROR, g_strdup_printf("Could not open or read file '%s'", path), -1);
-      return FALSE;
-   }
-
-   // search for existing script to overwrite or reread it
-   Script* scr = Client.Global.user_script;
-   if(scr && !strcmp(scr->path, path)) {
-      scr->path    = path;
-      scr->content = content;
-      return TRUE;
-   }
-
-   // load new script
-   Client.Global.user_script = malloc(sizeof(Script));
-   if(!Client.Global.user_script) notify(ERROR, "Out of memory", EXIT_FAILURE);
-
-   Client.Global.user_script->path    = path;
-   Client.Global.user_script->content = content;
-
-   return TRUE;
+   return load_script(argv[0]);
 }
 
 gboolean cmd_session(int argc, char** argv) {
    if(argc<=1 || argv[argc]!=NULL)  return FALSE;
 
-   //gchar* session_name   = g_strjoinv(" ", argv);
    gchar* session_name   = argv[1];
    
    gboolean to_return=FALSE;
@@ -269,7 +233,6 @@ gboolean cmd_settings(int argc, char** argv) {
 
             if(settings[i].variable) {
                gboolean *x = (gboolean*) (settings[i].variable);
-               //*x = !(*x);
                *x = value;
             }
 
@@ -398,10 +361,8 @@ gboolean cmd_write(int argc, char** argv) {
       g_free(bookmark);
    }
 
-   char* bookmark_file = g_build_filename(g_get_home_dir(), config_dir, bookmarks, NULL);
-   g_file_set_contents(bookmark_file, bookmark_list->str, -1, NULL);
+   g_file_set_contents(bookmarks, bookmark_list->str, -1, NULL);
 
-   g_free(bookmark_file);
    g_string_free(bookmark_list, TRUE);
 
    // save history 
@@ -416,10 +377,8 @@ gboolean cmd_write(int argc, char** argv) {
       h_counter += 1;
    }
 
-   char* history_file = g_build_filename(g_get_home_dir(), config_dir, history, NULL);
-   g_file_set_contents(history_file, history_list->str, -1, NULL);
+   g_file_set_contents(history, history_list->str, -1, NULL);
 
-   g_free(history_file);
    g_string_free(history_list, TRUE);
 
    // save session
@@ -435,10 +394,8 @@ gboolean cmd_write(int argc, char** argv) {
       g_free(session_lines);
    }
 
-   gchar* session_file = g_build_filename(g_get_home_dir(), config_dir, sessions, NULL);
-   g_file_set_contents(session_file, session_list->str, -1, NULL);
+   g_file_set_contents(sessions, session_list->str, -1, NULL);
 
-   g_free(session_file);
    g_string_free(session_list, TRUE);
 
    return TRUE;

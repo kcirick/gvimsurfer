@@ -78,9 +78,9 @@ gboolean cb_download_progress(WebKitDownload* d, GParamSpec* pspec){
 
    if (status != WEBKIT_DOWNLOAD_STATUS_STARTED && status != WEBKIT_DOWNLOAD_STATUS_CREATED) {
       if (status != WEBKIT_DOWNLOAD_STATUS_FINISHED)
-         notify(ERROR, g_strdup_printf("Error while downloading %s", webkit_download_get_suggested_filename(d)), -1);
+         notify(ERROR, g_strdup_printf("Error while downloading %s", webkit_download_get_suggested_filename(d)), FALSE, -1);
       else
-         notify(INFO, g_strdup_printf("Download %s finished", webkit_download_get_suggested_filename(d)), -1);
+         notify(INFO, g_strdup_printf("Download %s finished", webkit_download_get_suggested_filename(d)), FALSE, -1);
       Client.Global.active_downloads = g_list_remove(Client.Global.active_downloads, d);
    }
    update_statusbar_info();
@@ -96,7 +96,7 @@ gboolean cb_inputbar_activate(GtkEntry* entry, gpointer data) {
 
    // no input 
    if(strlen(input) <= 1) {
-      isc_abort(NULL);
+      abort_input();
       g_free(input);
       return FALSE;
    }
@@ -107,8 +107,7 @@ gboolean cb_inputbar_activate(GtkEntry* entry, gpointer data) {
       arg.data = (char*)input+1;
       search_and_highlight(&arg);
 
-      isc_abort(NULL);
-      gtk_widget_grab_focus(GTK_WIDGET(GET_CURRENT_TAB_WIDGET()));
+      abort_input();
       g_free(input);
       return TRUE;
    }
@@ -128,13 +127,11 @@ gboolean cb_inputbar_activate(GtkEntry* entry, gpointer data) {
       }
    }
 
-   if(!succ) notify(ERROR, "Unknown command.", -1);
+   if(!succ) notify(ERROR, "Unknown command.", FALSE, -1);
 
-   if(retv) isc_abort(NULL);
+   if(retv) abort_input();
    else     set_inputbar_visibility(HIDE); 
 
-   gtk_widget_grab_focus(GTK_WIDGET(GET_CURRENT_TAB_WIDGET()));
-   //change_mode(NORMAL);
    g_strfreev(tokens);
    
    return TRUE;
@@ -148,23 +145,23 @@ gboolean cb_inputbar_kb_pressed(GtkWidget* widget, GdkEventKey* event, gpointer 
          event->state, event->group, &keyval, NULL, NULL, &irrelevant);
 
    gchar  *input  = gtk_editable_get_chars(GTK_EDITABLE(Client.UI.inputbar), 0, -1);
-   if(strlen(input)<=1 && keyval==GDK_BackSpace)
-      isc_abort(NULL);
+   if(keyval==GDK_Escape || (strlen(input)<=1 && keyval==GDK_BackSpace))
+      abort_input();
    
    /* inputbar shortcuts */
-   for(unsigned int i=0; i<LENGTH(inputbar_shortcuts); i++) {
-      InputbarShortcut* isc = (InputbarShortcut*)&inputbar_shortcuts[i];
-      if (keyval == isc->key                                         // test key
-            && (event->state & ~irrelevant & ALL_MASK) == isc->mask) // test mask 
-      {
-         isc->function(&(isc->argument));
-         return TRUE;
-      }
+   switch (keyval) {
+      case GDK_Tab:
+         run_completion(NEXT); return TRUE;
+      case GDK_Up:
+         run_completion(PREVIOUS); return TRUE;
+      case GDK_Down:
+         run_completion(NEXT); return TRUE;
    }
+
    return FALSE;
 }
 
-gboolean cb_wv_button_release_event(GtkWidget* widget, GdkEvent* event, gpointer data) {
+gboolean cb_wv_button_release(GtkWidget* widget, GdkEvent* event, gpointer data) {
    for(unsigned int i = 0; i < LENGTH(mouse); i++) {
       if( event->button.button == mouse[i].button              // test button
             && (event->button.state & ALL_MASK) == mouse[i].mask // test mask
@@ -310,7 +307,7 @@ gboolean cb_tab_kb_pressed(WebKitWebView *wv, GdkEventKey *event) {
    return FALSE;
 }
 
-gboolean cb_wv_mimetype_policy_decision(WebKitWebView* wv, WebKitWebFrame* frame,
+gboolean cb_wv_mime_type(WebKitWebView* wv, WebKitWebFrame* frame,
       WebKitNetworkRequest* request, char* mimetype, WebKitWebPolicyDecision* decision, gpointer data) {
    if(!webkit_web_view_can_show_mime_type(wv, mimetype)) {
       webkit_web_policy_decision_download(decision);
@@ -319,7 +316,7 @@ gboolean cb_wv_mimetype_policy_decision(WebKitWebView* wv, WebKitWebFrame* frame
    return FALSE;
 }
 
-gboolean cb_wv_nav_policy_decision(WebKitWebView* wv, WebKitWebFrame* frame,
+gboolean cb_wv_navigation(WebKitWebView* wv, WebKitWebFrame* frame,
       WebKitNetworkRequest* request, WebKitWebNavigationAction* action,
       WebKitWebPolicyDecision* decision, gpointer data) {
    switch(webkit_web_navigation_action_get_button(action)) {
@@ -350,27 +347,20 @@ gboolean cb_wv_notify_title(WebKitWebView* wv, GParamSpec* pspec, gpointer data)
    return TRUE;
 }
 
-gboolean cb_wv_window_object_cleared(WebKitWebView* wv, WebKitWebFrame* frame, gpointer context,
-      gpointer window_object, gpointer data) {
+gboolean cb_wv_load_committed(WebKitWebView* wv, WebKitWebFrame* frame, gpointer user_data){
 
-   /* load all added scripts */
-   JSStringRef script;
-   JSValueRef exc;
    gchar *buffer = Client.Global.user_script->content;
+   if(!buffer){
+      notify(WARNING, "No script loaded", FALSE, -1);
+      return FALSE;
+   }
 
-   script = JSStringCreateWithUTF8CString(buffer);
-   JSEvaluateScript((JSContextRef)context, script, JSContextGetGlobalObject((JSContextRef)context), NULL, 0, &exc);
-   JSStringRelease(script);
-
-   if(!g_object_get_data(G_OBJECT(GET_CURRENT_TAB()), "loaded_scripts")) 
-      run_script(buffer, NULL, NULL);
-
-   g_object_set_data(G_OBJECT(GET_CURRENT_TAB()), "loaded_scripts",  (gpointer) 1);
+   run_script(buffer, NULL, NULL);
 
    return TRUE;
 }
 
-gboolean cb_wv_window_policy_decision(WebKitWebView* wv, WebKitWebFrame* frame, WebKitNetworkRequest* request,
+gboolean cb_wv_new_window(WebKitWebView* wv, WebKitWebFrame* frame, WebKitNetworkRequest* request,
       WebKitWebNavigationAction* action, WebKitWebPolicyDecision* decision, gpointer data) {
    if(webkit_web_navigation_action_get_reason(action) == WEBKIT_WEB_NAVIGATION_REASON_LINK_CLICKED) {
       webkit_web_policy_decision_ignore(decision);

@@ -4,7 +4,6 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include <math.h>
 
 #include <gtk/gtk.h>
 #include <webkit/webkit.h>
@@ -18,7 +17,6 @@
 #include "include/commands.h"
 
 #include "config/config.h"
-#include "config/commands.h"
 
 //--- Shortcuts -----
 void sc_abort(Argument* argument) {
@@ -389,7 +387,7 @@ void sc_yank(Argument* argument) {
       gtk_clipboard_set_text(gtk_clipboard_get(GDK_SELECTION_PRIMARY), uri, -1);
 
    gchar* message = g_strdup_printf("Yanked %s", uri);
-   notify(INFO, message, -1);
+   notify(INFO, message, FALSE, -1);
    g_free(message);
 }
 
@@ -410,217 +408,3 @@ void sc_zoom(Argument* argument) {
    }
 }
 
-//--- Input Shortcuts -----
-void isc_abort(Argument* argument) {
-   Argument arg = { HIDE, NULL };
-   isc_completion(&arg);
-
-   gtk_label_set_text((GtkLabel*) Client.Statusbar.message, "");
-   change_mode(NORMAL);
-   gtk_widget_grab_focus(GTK_WIDGET(GET_CURRENT_TAB_WIDGET()));
-   //gtk_widget_grab_focus(GTK_WIDGET(GET_CURRENT_TAB()));
-   set_inputbar_visibility(HIDE);
-}
-
-// TODO Needs major clean up
-void isc_completion(Argument* argument) {
-   gchar *input      = gtk_editable_get_chars(GTK_EDITABLE(Client.UI.inputbar), 0, -1);
-   if(strlen(input)==0 || (input[0]!=':' && argument->n!=HIDE)) {
-      g_free(input);
-      return;
-   }
-
-   gchar *input_m    = input + 1;
-   gint   length     = strlen(input_m);
-   if(length==0){
-      g_free(input);
-      return;
-   }
-
-   // get current information
-   gchar **entries = g_strsplit_set(input_m, " ", -1);
-   gint n_entries = g_strv_length(entries);
-
-   gchar* current_command        = entries[0];
-   gint   current_command_length = strlen(current_command);
-   gchar* current_parameter      =  n_entries==1 ? NULL : entries[n_entries-1];
-
-   // static elements
-   static GtkBox        *results = NULL;
-   static CompletionRow *rows    = NULL;
-
-   static gint current_item = 0;
-   static gint n_items      = 0;
-
-   static gchar *previous_command   = NULL;
-   static gchar *previous_parameter = NULL;
-   static gint   previous_id        = 0;
-   static gint   previous_length    = 0;
-
-   /* delete old list if
-    *   the completion should be hidden
-    *   the current command differs from the previous one
-    *   the current parameter differs from the previous one
-    */
-   if( (argument->n == HIDE) ||
-         (current_parameter && previous_parameter && strcmp(current_parameter, previous_parameter)) ||
-         (current_command && previous_command && strcmp(current_command, previous_command)) ||
-         (previous_length != length)
-     ) {
-      if(results)    gtk_widget_destroy(GTK_WIDGET(results));
-      results        = NULL;
-
-      if(rows)       free(rows);
-      rows           = NULL;
-      current_item   = 0;
-      n_items        = 0;
-
-      if(argument->n == HIDE) {
-         g_free(input);
-         return;
-      }
-   }
-
-   //--- create new list -----
-   if( !results ) {
-      results = GTK_BOX(gtk_vbox_new(FALSE, 0));
-
-      // create list based on parameters 
-      if(n_entries>1) {
-         for(unsigned int i = 0; i < LENGTH(commands); i++) {
-            if( g_strcmp0(current_command, commands[i].command)!=0 ) continue;
-
-            if(commands[i].completion) {
-               previous_command = current_command;
-               previous_id = i;
-               break;
-            } 
-
-            g_free(input);
-            return;
-         }
-
-         Completion *result = commands[previous_id].completion(current_parameter ? current_parameter : "");
-         if(!result || !result->groups) {
-            g_free(input);
-            return;
-         }
-
-         rows = malloc(sizeof(CompletionRow));
-         if(!rows) notify(ERROR, "Out of memory", EXIT_FAILURE);
-
-         for(GList* grlist = result->groups; grlist; grlist = g_list_next(grlist)) {
-            CompletionGroup* group = (CompletionGroup*)grlist->data;
-            int group_elements = 0;
-
-            for(GList* element = group->elements; element; element = g_list_next(element)) {
-               if(element->data) {
-                  if (group->value && !group_elements) {
-                     rows = realloc(rows, (n_items + 1) * sizeof(CompletionRow));
-                     rows[n_items].command     = group->value;
-                     rows[n_items].command_id  = -1;
-                     rows[n_items].is_group    = TRUE;
-                     rows[n_items++].row       = GTK_WIDGET(cr_create(results, group->value, TRUE));
-                  }
-
-                  rows = realloc(rows, (n_items + 1) * sizeof(CompletionRow));
-                  rows[n_items].command     = element->data;
-                  rows[n_items].command_id  = previous_id;
-                  rows[n_items].is_group    = FALSE;
-                  rows[n_items++].row       = GTK_WIDGET(cr_create(results, element->data, FALSE));
-                  group_elements++;
-               }
-            }
-         }
-         // clean up
-         completion_free(result);
-      }
-      // create list based on commands
-      else {
-
-         rows = malloc(LENGTH(commands) * sizeof(CompletionRow));
-         if(!rows)   notify(ERROR, "Out of memory", EXIT_FAILURE);
-
-         for(unsigned int i = 0; i < LENGTH(commands); i++) {
-            int cmd_length  = commands[i].command ? strlen(commands[i].command) : 0;
-
-            if( current_command_length <= cmd_length  && !strncmp(current_command, commands[i].command, current_command_length) ) {
-               rows[n_items].command     = commands[i].command;
-               rows[n_items].command_id  = i;
-               rows[n_items].is_group    = FALSE;
-               rows[n_items++].row       = GTK_WIDGET(cr_create(results, commands[i].command, FALSE));
-            }
-         }
-         rows = realloc(rows, n_items * sizeof(CompletionRow));
-      }
-
-      gtk_box_pack_start(Client.UI.box, GTK_WIDGET(results), FALSE, FALSE, 0);
-      gtk_widget_show(GTK_WIDGET(results));
-
-      current_item = (argument->n == NEXT) ? -1 : 0;
-   }
-
-   /* update coloring iff there is a list with items */
-   if( (results) && (n_items > 0) ) {
-      int i = 0, next_group = 0;
-
-      if(!rows[current_item].is_group) cr_set_color(results, NORMAL, current_item);
-
-      for(i = 0; i < n_items; i++) {
-         if(argument->n == NEXT || argument->n == NEXT_GROUP || argument->n == SHOW)
-            current_item = (current_item + n_items + 1) % n_items;
-         else if(argument->n == PREVIOUS || argument->n == PREVIOUS_GROUP)
-            current_item = (current_item + n_items - 1) % n_items;
-
-         if(rows[current_item].is_group) {
-            if(n_entries>1 && (argument->n == NEXT_GROUP || argument->n == PREVIOUS_GROUP))
-               next_group = 1;
-            continue;
-         } else {
-            if(n_entries>1 && (next_group == 0) && (argument->n == NEXT_GROUP || argument->n == PREVIOUS_GROUP))
-               continue;
-            break;
-         }
-      }
-      cr_set_color(results, HIGHLIGHT, current_item);
-
-      /* hide other items */
-      int uh = ceil(n_completion_items / 2);
-      int lh = floor(n_completion_items / 2);
-
-      for(i = 0; i < n_items; i++) {
-         if((n_items > 1) && (
-                  (i >= (current_item - lh) && (i <= current_item + uh)) ||
-                  (i < n_completion_items && current_item < lh) ||
-                  (i >= (n_items - n_completion_items) && (current_item >= (n_items - uh))))
-           )
-            gtk_widget_show(rows[i].row);
-         else
-            gtk_widget_hide(rows[i].row);
-      }
-
-      gchar* temp;
-      if(n_entries==1)
-         temp = g_strconcat(":", rows[current_item].command, (n_items == 1) ? " "  : NULL, NULL);
-      else{
-         gchar* other_parameters = "";
-         for(i=1; i<n_entries-1; i++)
-            other_parameters = g_strconcat(" ", entries[i], NULL);
-
-         temp = g_strconcat(":", previous_command, other_parameters, " ", rows[current_item].command, NULL);
-      }
-
-      gtk_entry_set_text(Client.UI.inputbar, temp);
-      gtk_editable_set_position(GTK_EDITABLE(Client.UI.inputbar), -1);
-      g_free(temp);
-
-      previous_command   = (n_entries==1) ? rows[current_item].command : current_command;
-      previous_parameter = (n_entries==1) ? current_parameter : rows[current_item].command;
-      previous_length    = strlen(previous_command);
-      if(n_entries==1)  previous_length += length - current_command_length;
-      else              previous_length += strlen(previous_parameter) + 1;
-
-      previous_id = rows[current_item].command_id;
-   }
-   g_free(input);
-}

@@ -72,13 +72,4 @@ Shortcut shortcuts[] = {
   {0,       "^[0-9]+p$", GDK_m,            sc_pagemark,         { 0,                 NULL }},
 };
 
-//--- Inputbar shortcuts -----
-InputbarShortcut inputbar_shortcuts[] = {
-  // mask,  key,               function,         argument
-  {0,       GDK_Escape,        isc_abort,        { 0,           NULL } },
-  {0,       GDK_Down,          isc_completion,   { NEXT,        NULL } },
-  {0,       GDK_Up,            isc_completion,   { PREVIOUS,    NULL } },
-  {0,       GDK_Tab,           isc_completion,   { SHOW,        NULL } },
-};
-
 #endif

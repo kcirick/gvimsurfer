@@ -21,17 +21,21 @@ int main(int argc, char* argv[]) {
 
    static GError *err;
    static gboolean version = FALSE;
+   static gboolean private = FALSE;
    static const gchar* cfile = NULL;
    static GOptionEntry opts[] = {
-      { "version", 'v', 0, G_OPTION_ARG_NONE, &version, "Print version", NULL },
-      { "configfile",  'c', 0, G_OPTION_ARG_STRING, &cfile, "Specify config file", NULL },
+      { "version",      'v', 0, G_OPTION_ARG_NONE, &version, "Print version", NULL },
+      { "configfile",   'c', 0, G_OPTION_ARG_STRING, &cfile, "Specify config file", NULL },
+      { "private",      'p', 0, G_OPTION_ARG_NONE, &private, "Open in private mode", NULL },
       { NULL } };
 
    if (!gtk_init_with_args(&argc, &argv, "[URL1 URL2 ...]", opts, NULL, &err))
-      notify(ERROR, err->message, EXIT_FAILURE);
+      notify(ERROR, err->message, TRUE, EXIT_FAILURE);
 
    if (version)
-      notify(INFO, "Version "VERSION, EXIT_SUCCESS);
+      notify(INFO, "Version "VERSION, TRUE, EXIT_SUCCESS);
+
+   private_browsing = private;
 
    // read config file
    gchar* configfile=NULL;
@@ -41,7 +45,7 @@ int main(int argc, char* argv[]) {
       configfile = g_build_filename(g_get_home_dir(), default_config_file, NULL);
 
    if(!read_configuration(configfile)) 
-      notify(ERROR, g_strdup_printf("Invalid configuration file: %s", configfile), EXIT_FAILURE);
+      notify(ERROR, g_strdup_printf("Invalid configuration file: %s", configfile), TRUE, EXIT_FAILURE);
 
    // init client 
    init_client();

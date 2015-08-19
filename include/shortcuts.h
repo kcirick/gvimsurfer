@@ -14,13 +14,6 @@ typedef struct {
 } Shortcut;
 
 typedef struct {
-   unsigned int   mask;
-   unsigned int   key;
-   void           (*function)(Argument*);
-   Argument       argument;
-} InputbarShortcut;
-
-typedef struct {
   unsigned int    mask;
   unsigned int    button;
   void            (*function)(Argument*);
@@ -52,8 +45,4 @@ void sc_toggle_sourcecode(Argument*);
 void sc_yank(Argument*);
 void sc_zoom(Argument*);
 
-void isc_abort(Argument*);
-void isc_completion(Argument*);
-
 #endif
-
