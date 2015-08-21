@@ -14,17 +14,11 @@
 #include "include/client.h"
 #include "include/utilities.h"
 #include "include/completion.h"
-#include "include/commands.h"
 
 #include "config/config.h"
 
 //--- Shortcuts -----
 void sc_abort(Argument* argument) {
-   // Clear buffer
-   if(Client.Global.buffer) {
-      g_string_free(Client.Global.buffer, TRUE);
-      Client.Global.buffer = NULL;
-   }
 
    // Clear hints
    gchar* cmd = "clear()";
@@ -32,7 +26,7 @@ void sc_abort(Argument* argument) {
 
    // Stop loading website
    if(webkit_web_view_get_progress(GET_CURRENT_TAB()) == 1.0)
-      cmd_stop(0, NULL);
+      webkit_web_view_stop_loading(GET_CURRENT_TAB());
 
    // Set back to normal mode
    change_mode(NORMAL);
@@ -44,16 +38,22 @@ void sc_abort(Argument* argument) {
    webkit_web_view_unmark_text_matches(GET_CURRENT_TAB());
 
    gtk_widget_grab_focus(GTK_WIDGET(GET_CURRENT_TAB_WIDGET()));
-   //gtk_widget_grab_focus(GTK_WIDGET(GET_CURRENT_TAB()));
 }
 
 void sc_change_mode(Argument* argument) {
    if(argument)
-      change_mode(argument->n);
+      change_mode(argument->i);
 }
 
 void sc_close_tab(Argument* argument) {
-   cmd_quit(0, NULL);
+   close_tab(gtk_notebook_get_current_page(Client.UI.webview));
+}
+
+void sc_copy_uri(Argument* argument) {
+   gchar* uri = (gchar*) webkit_web_view_get_uri(GET_CURRENT_TAB());
+   gtk_clipboard_set_text(gtk_clipboard_get(GDK_SELECTION_PRIMARY), uri, -1);
+
+   notify(INFO, g_strdup_printf("Copied %s", uri), FALSE, -1);
 }
 
 void sc_focus_input(Argument* argument){
@@ -68,8 +68,8 @@ void sc_focus_input(Argument* argument){
 
 void sc_focus_inputbar(Argument* argument) {
    if(argument->data) {
-      char* data = argument->data;
-      if(argument->n == APPEND_URL)
+      gchar* data = argument->data;
+      if(argument->b)
          data = g_strdup_printf("%s%s", data, webkit_web_view_get_uri(GET_CURRENT_TAB()));
       else
          data = g_strdup(data);
@@ -100,8 +100,8 @@ void sc_follow_link(Argument* argument) {
    GdkEventKey *key = (GdkEventKey*)argument->data;
 
    // update open mode
-   if(argument->n < 0)
-      open_mode = argument->n;
+   if(argument->i < 0)
+      open_mode = argument->i;
 
    /* show all links */
    if(!follow_links || Client.Global.mode != FOLLOW) {
@@ -114,7 +114,7 @@ void sc_follow_link(Argument* argument) {
    char* value = NULL;
    char* cmd   = NULL;
 
-   if (argument && argument->n == 10)
+   if (argument && argument->i == 10)
       cmd = g_strdup("get_active()");
    else if (key && key->keyval == GDK_Tab) {
       if ( key->state & GDK_CONTROL_MASK)
@@ -138,10 +138,8 @@ void sc_follow_link(Argument* argument) {
 }
 
 void sc_go_home(Argument* argument) {
-   if(argument->n == NEW_TAB)
-      create_tab(home_page, FALSE);
-   else
-      open_uri(GET_CURRENT_TAB(), home_page);
+   if(argument->b)   create_tab(home_page, FALSE);
+   else              open_uri(GET_CURRENT_TAB(), home_page);
 }
 
 void sc_go_parent(Argument* argument) {
@@ -197,55 +195,32 @@ void sc_go_parent(Argument* argument) {
 }
 
 void sc_navigate(Argument* argument) {
-   int increment = argument->data ? atoi(argument->data) : 1;
-   if(argument->n == BACKWARD)   increment *= -1;
-
-   webkit_web_view_go_back_or_forward(GET_CURRENT_TAB(), increment);
+   webkit_web_view_go_back_or_forward(GET_CURRENT_TAB(), argument->b?1:-1);
 }
 
 void sc_navigate_tabs(Argument* argument) {
    int current_tab     = gtk_notebook_get_current_page(Client.UI.webview);
    int number_of_tabs  = gtk_notebook_get_n_pages(Client.UI.webview);
-   int step            = 1;
-   char* buffer;
-
-   if(argument->n == PREVIOUS) step = -1;
+   int step            = argument->i==PREVIOUS ? -1 : 1;
 
    int new_tab = (current_tab + step) % number_of_tabs;
 
-   if(argument->n == SPECIFIC) {
-      if (argument->data)
-         buffer = argument->data;
-      else
-         buffer = Client.Global.buffer->str;
+   if(argument->i == SPECIFIC) {
+      gchar* buffer;
+      if (argument->data)  buffer = argument->data;
+      else                 buffer = Client.Global.buffer->str;
 
-      int digit_end = 0;
-      while(g_ascii_isdigit(buffer[digit_end]))
-         digit_end = digit_end + 1;
-
-      char* number = g_strndup(buffer, digit_end);
-      new_tab      = atoi(number) - 1;
-      g_free(number);
+      new_tab = get_int_from_buffer(buffer) - 1;
    }
 
    gtk_notebook_set_current_page(Client.UI.webview, new_tab);
    gtk_widget_grab_focus(GTK_WIDGET(GET_CURRENT_TAB_WIDGET()));
-   //gtk_widget_grab_focus(GTK_WIDGET(GET_CURRENT_TAB()));
 
-   update_client();
+   update_client(new_tab);
 }
 
 void sc_pagemark(Argument* argument) {
-
-   char* buffer = Client.Global.buffer->str;
-
-   int digit_end = 0;
-   while(g_ascii_isdigit(buffer[digit_end]))
-      digit_end = digit_end + 1;
-
-   char* number = g_strndup(buffer, digit_end);
-   int id = atoi(number);
-   g_free(number);
+   gint id = get_int_from_buffer(Client.Global.buffer->str);
 
    GList* list;
    for(list = Client.Global.pagemarks; list; list = g_list_next(list)) {
@@ -259,34 +234,23 @@ void sc_pagemark(Argument* argument) {
          adjustment = gtk_scrolled_window_get_hadjustment(GET_CURRENT_TAB_WIDGET());
          gtk_adjustment_set_value(adjustment, pmark->hadjustment);
          webkit_web_view_set_zoom_level(GET_CURRENT_TAB(), pmark->zoom_level);
-         update_client();
+         update_client(gtk_notebook_get_current_page(Client.UI.webview));
          return;
       }
    }
 }
 
 void sc_paste(Argument* argument) {
-   gchar* text;
-   text = gtk_clipboard_wait_for_text(gtk_clipboard_get(GDK_SELECTION_PRIMARY));
+   gchar* text = gtk_clipboard_wait_for_text(gtk_clipboard_get(GDK_SELECTION_PRIMARY));
 
-   if(argument->n == NEW_TAB)
-      create_tab(text, FALSE);
-   else
-      open_uri(GET_CURRENT_TAB(), text);
+   if(argument->b)   create_tab(text, FALSE);
+   else              open_uri(GET_CURRENT_TAB(), text);
 
    g_free(text);
 }
 
 void sc_quickmark(Argument* argument) {
-   char* buffer = Client.Global.buffer->str;
-
-   int digit_end = 0;
-   while(g_ascii_isdigit(buffer[digit_end]))
-      digit_end = digit_end + 1;
-
-   char* number = g_strndup(buffer, digit_end);
-   int id = atoi(number);
-   g_free(number);
+   gint id = get_int_from_buffer(Client.Global.buffer->str);
 
    GList* list;
    for(list = Client.Global.quickmarks; list; list = g_list_next(list)) {
@@ -299,12 +263,8 @@ void sc_quickmark(Argument* argument) {
    }
 }
 
-void sc_quit(Argument* argument) {
-   cmd_quitall(0, NULL);
-}
-
 void sc_reload(Argument* argument) {
-   if(argument->n == BYPASS_CACHE)
+   if(argument->b)
       webkit_web_view_reload_bypass_cache(GET_CURRENT_TAB());
    else
       webkit_web_view_reload(GET_CURRENT_TAB());
@@ -327,7 +287,7 @@ void sc_run_script(Argument* argument) {
 void sc_scroll(Argument* argument) {
    GtkAdjustment* adjustment;
 
-   if( (argument->n == LEFT) || (argument->n == RIGHT) || (argument->n == MAX_LEFT) || (argument->n == MAX_RIGHT) )
+   if( (argument->i == LEFT) || (argument->i == RIGHT) || (argument->i == MAX_LEFT) || (argument->i == MAX_RIGHT) )
       adjustment = gtk_scrolled_window_get_hadjustment(GET_CURRENT_TAB_WIDGET());
    else
       adjustment = gtk_scrolled_window_get_vadjustment(GET_CURRENT_TAB_WIDGET());
@@ -336,35 +296,35 @@ void sc_scroll(Argument* argument) {
    gdouble value      = gtk_adjustment_get_value(adjustment);
    gdouble max        = gtk_adjustment_get_upper(adjustment) - view_size;
 
-   if(argument->n == SPECIFIC){
+   if(argument->i == SPECIFIC){
       char* buffer = Client.Global.buffer->str;
       int number     = atoi(g_strndup(buffer, strlen(buffer) - 1));
       int percentage = (number < 0) ? 0 : (number > 100) ? 100 : number;
       gdouble value  = (max / 100.0f) * (float) percentage;
 
       gtk_adjustment_set_value(adjustment, value);
-   } else if(argument->n == FULL_UP)
+   } else if(argument->i == FULL_UP)
       gtk_adjustment_set_value(adjustment, (value - view_size) < 0 ? 0 : (value - view_size));
-   else if(argument->n == FULL_DOWN)
+   else if(argument->i == FULL_DOWN)
       gtk_adjustment_set_value(adjustment, (value + view_size) > max ? max : (value + view_size));
-   else if((argument->n == LEFT) || (argument->n == UP))
+   else if((argument->i == LEFT) || (argument->i == UP))
       gtk_adjustment_set_value(adjustment, (value - scroll_step) < 0 ? 0 : (value - scroll_step));
-   else if(argument->n == TOP || argument->n == MAX_LEFT)
+   else if(argument->i == TOP || argument->i == MAX_LEFT)
       gtk_adjustment_set_value(adjustment, 0);
-   else if(argument->n == BOTTOM || argument->n == MAX_RIGHT)
+   else if(argument->i == BOTTOM || argument->i == MAX_RIGHT)
       gtk_adjustment_set_value(adjustment, max);
    else
       gtk_adjustment_set_value(adjustment, (value + scroll_step) > max ? max : (value + scroll_step));
 }
 
 void sc_search(Argument* argument) {
-   search_and_highlight(argument);
+   search_and_highlight(argument->b, argument->data);
 }
 
 void sc_toggle_sourcecode(Argument* argument) {
    gchar* uri    = (gchar*) webkit_web_view_get_uri(GET_CURRENT_TAB());
 
-   if(argument->n == OPEN_EXTERNAL) {
+   if(argument->b) {
       char* command = g_strdup_printf("%s %s", external_editor, uri);
 
       g_spawn_command_line_async(command, NULL);
@@ -377,31 +337,17 @@ void sc_toggle_sourcecode(Argument* argument) {
    }
 }
 
-void sc_yank(Argument* argument) {
-   gchar* uri = (gchar*) webkit_web_view_get_uri(GET_CURRENT_TAB());
-   if (argument->n == XA_CLIPBOARD)
-      gtk_clipboard_set_text(gtk_clipboard_get(GDK_SELECTION_CLIPBOARD), uri, -1);
-   else if (argument->n == XA_SECONDARY)
-      gtk_clipboard_set_text(gtk_clipboard_get(GDK_SELECTION_SECONDARY), uri, -1);
-   else
-      gtk_clipboard_set_text(gtk_clipboard_get(GDK_SELECTION_PRIMARY), uri, -1);
-
-   gchar* message = g_strdup_printf("Yanked %s", uri);
-   notify(INFO, message, FALSE, -1);
-   g_free(message);
-}
-
 void sc_zoom(Argument* argument) {
    float zoom_level = webkit_web_view_get_zoom_level(GET_CURRENT_TAB());
    char* buffer = Client.Global.buffer->str;
 
-   if(argument->n == ZOOM_IN)
+   if(argument->i == ZOOM_IN)
       webkit_web_view_set_zoom_level(GET_CURRENT_TAB(), zoom_level + (float) (zoom_step / 100));
-   else if(argument->n == ZOOM_OUT)
+   else if(argument->i == ZOOM_OUT)
       webkit_web_view_set_zoom_level(GET_CURRENT_TAB(), zoom_level - (float) (zoom_step / 100));
-   else if(argument->n == ZOOM_ORIGINAL)
+   else if(argument->i == ZOOM_ORIGINAL)
       webkit_web_view_set_zoom_level(GET_CURRENT_TAB(), 1.0f);
-   else if(argument->n == SPECIFIC) {
+   else if(argument->i == SPECIFIC) {
       char* number = g_strndup(buffer, strlen(buffer) - 1);
       webkit_web_view_set_zoom_level(GET_CURRENT_TAB(), (float) (atoi(number) / 100));
       g_free(number);

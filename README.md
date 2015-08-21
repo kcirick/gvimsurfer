@@ -17,25 +17,26 @@ Web browser that looks and works like gVim
 
 ## Installation:
 
-  1. Clone a copy:
-     `> git clone https://github.com/kcirick/gvimsurfer.git`
-  2. Compile the code: 
-     `> make`
-  3. Run the setup script: 
-     `> sh setup.sh`
-  4. Make changes to configrc
-  5. Run 'gvimsurfer' (try 'gvimsurfer --help' for help)
+  1. Clone a copy: `> git clone https://github.com/kcirick/gvimsurfer.git`
+  2. Compile the code: `> make`
+  3. Make a link to the excutable (Optional): `> ln -s gvimsurfer ~/.local/bin/gvimsurfer`
+  4. Run the setup script: `> sh setup.sh`
+  5. Make changes to configrc
+  6. Run 'gvimsurfer' (try 'gvimsurfer --help' for help)
 
 
 ## A screenshot:
 
-  - Version 0.2<br /> 
 <a href='http://s6.postimg.org/yrjhkoqn5/Screenshot_190815_02_21_42_AM.png' target='_blank'><img src='http://s6.postimg.org/yrjhkoqn5/Screenshot_190815_02_21_42_AM.png' width="350" /></a>
 <a href='http://s6.postimg.org/iukpnyy8x/Screenshot_190815_02_22_09_AM.png' target='_blank'><img src='http://s6.postimg.org/iukpnyy8x/Screenshot_190815_02_22_09_AM.png' width="350" /></a><br /><br />
 
 
 ## Version Log:
 
+  - 0.3 (Work-in-progress):
+   - Correctly updates when clicking on tabs
+   - Fix several seg faults and weird crashes
+   - General code clean-up
   - 0.2 (2015-08-19):
    - Adding close button to tabs
    - Better support for focus during INSERT mode

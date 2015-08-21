@@ -32,6 +32,11 @@ gboolean cb_button_close_tab(GtkButton *button, GtkNotebook *notebook) {
   return TRUE;
 }
 
+gboolean cb_notebook_switch_page(GtkNotebook *notebook, gpointer page, guint page_num, gpointer user_data) {
+   update_client(page_num); 
+   return TRUE;
+}
+
 gboolean cb_destroy(GtkWidget* widget, gpointer data) {
    pango_font_description_free(Client.Style.font);
 
@@ -68,6 +73,7 @@ gboolean cb_destroy(GtkWidget* widget, gpointer data) {
 
    g_list_free(Client.Global.pagemarks);
 
+   // quit application
    gtk_main_quit();
 
    return TRUE;
@@ -83,7 +89,7 @@ gboolean cb_download_progress(WebKitDownload* d, GParamSpec* pspec){
          notify(INFO, g_strdup_printf("Download %s finished", webkit_download_get_suggested_filename(d)), FALSE, -1);
       Client.Global.active_downloads = g_list_remove(Client.Global.active_downloads, d);
    }
-   update_statusbar_info();
+   update_statusbar_info(gtk_notebook_get_current_page(Client.UI.webview));
    return TRUE;
 }
 
@@ -92,22 +98,19 @@ gboolean cb_inputbar_activate(GtkEntry* entry, gpointer data) {
    char identifier = input[0];
    gboolean  retv = FALSE;
    gboolean  succ = FALSE;
-   Argument arg;
 
    // no input 
    if(strlen(input) <= 1) {
-      abort_input();
+      clear_input();
       g_free(input);
       return FALSE;
    }
 
    // search command 
    if(identifier == '/'){
-      arg.n = FORWARD;
-      arg.data = (char*)input+1;
-      search_and_highlight(&arg);
+      search_and_highlight(FORWARD, (gchar*)input+1);
 
-      abort_input();
+      clear_input();
       g_free(input);
       return TRUE;
    }
@@ -115,7 +118,7 @@ gboolean cb_inputbar_activate(GtkEntry* entry, gpointer data) {
    gchar **tokens = g_strsplit(input + 1, " ", -1);
    g_free(input);
    gchar *command = tokens[0];
-   int     length = g_strv_length(tokens);
+   gint    length = g_strv_length(tokens);
 
    // search commands
    for(unsigned int i = 0; i < LENGTH(commands); i++) {
@@ -129,7 +132,7 @@ gboolean cb_inputbar_activate(GtkEntry* entry, gpointer data) {
 
    if(!succ) notify(ERROR, "Unknown command.", FALSE, -1);
 
-   if(retv) abort_input();
+   if(retv) clear_input();
    else     set_inputbar_visibility(HIDE); 
 
    g_strfreev(tokens);
@@ -146,16 +149,16 @@ gboolean cb_inputbar_kb_pressed(GtkWidget* widget, GdkEventKey* event, gpointer 
 
    gchar  *input  = gtk_editable_get_chars(GTK_EDITABLE(Client.UI.inputbar), 0, -1);
    if(keyval==GDK_Escape || (strlen(input)<=1 && keyval==GDK_BackSpace))
-      abort_input();
+      clear_input();
    
-   /* inputbar shortcuts */
+   //--- inputbar shortcuts -----
    switch (keyval) {
       case GDK_Tab:
-         run_completion(NEXT); return TRUE;
+         run_completion(NEXT);      return TRUE;
       case GDK_Up:
-         run_completion(PREVIOUS); return TRUE;
+         run_completion(PREVIOUS);  return TRUE;
       case GDK_Down:
-         run_completion(NEXT); return TRUE;
+         run_completion(NEXT);      return TRUE;
    }
 
    return FALSE;
@@ -190,7 +193,7 @@ gboolean cb_wv_button_release(GtkWidget* widget, GdkEvent* event, gpointer data)
    return FALSE;
 }
 
-gboolean cb_wv_console_message(WebKitWebView* wv, char* message, int line, char* source, gpointer data) {
+gboolean cb_wv_console_message(WebKitWebView* wv, gchar* message, gint line, gchar* source, gpointer data) {
 
    if(!strcmp(message, "hintmode_off") || !strcmp(message, "insertmode_off"))
       change_mode(NORMAL);
@@ -201,16 +204,16 @@ gboolean cb_wv_console_message(WebKitWebView* wv, char* message, int line, char*
 }
 
 GtkWidget* cb_wv_create_webview(WebKitWebView* wv, WebKitWebFrame* frame, gpointer data) {
-   return create_tab((char*)webkit_web_view_get_uri(wv), TRUE);
+   return create_tab(webkit_web_view_get_uri(wv), TRUE);
 }
 
 gboolean cb_wv_download_request(WebKitWebView* wv, WebKitDownload* download, gpointer data) {
 
-   download_content(download, (char*)webkit_download_get_suggested_filename(download));
+   download_content(download, webkit_download_get_suggested_filename(download));
    return TRUE;
 }
 
-gboolean cb_wv_hover_link(WebKitWebView* wv, char* title, char* link, gpointer data) {
+gboolean cb_wv_hover_link(WebKitWebView* wv, gchar* title, gchar* link, gpointer data) {
    if(link) {
       link = g_strconcat("Link: ", link, NULL);
       gtk_label_set_text((GtkLabel*) Client.Statusbar.uri, link);
@@ -229,7 +232,7 @@ gboolean cb_wv_kb_pressed(WebKitWebView *wv, GdkEventKey *event) {
          event->state, event->group, &keyval, NULL, NULL, &irrelevant);
 
    if(keyval == GDK_Escape){
-      Argument arg={0, NULL};
+      Argument arg={0};
       sc_abort(&arg);
    } else {
       // Check the window element (likely editable if being typed...)
@@ -273,7 +276,7 @@ gboolean cb_tab_kb_pressed(WebKitWebView *wv, GdkEventKey *event) {
         ) {
          sc->function(&(sc->argument));
          if(Client.Global.buffer!=NULL){
-            g_string_free(Client.Global.buffer, TRUE);
+            //g_string_free(Client.Global.buffer, TRUE);
             Client.Global.buffer = NULL;
             gtk_label_set_text((GtkLabel*) Client.Statusbar.message, "");
          }
@@ -300,15 +303,15 @@ gboolean cb_tab_kb_pressed(WebKitWebView *wv, GdkEventKey *event) {
 
    // follow hints
    if(Client.Global.mode == FOLLOW) {
-      Argument argument = {0, event};
+      Argument argument = {0};
       sc_follow_link(&argument);
       return TRUE;
    }
    return FALSE;
 }
 
-gboolean cb_wv_mime_type(WebKitWebView* wv, WebKitWebFrame* frame,
-      WebKitNetworkRequest* request, char* mimetype, WebKitWebPolicyDecision* decision, gpointer data) {
+gboolean cb_wv_mime_type(WebKitWebView* wv, WebKitWebFrame* frame, WebKitNetworkRequest* request, 
+      gchar* mimetype, WebKitWebPolicyDecision* decision, gpointer data) {
    if(!webkit_web_view_can_show_mime_type(wv, mimetype)) {
       webkit_web_policy_decision_download(decision);
       return TRUE;
@@ -316,14 +319,13 @@ gboolean cb_wv_mime_type(WebKitWebView* wv, WebKitWebFrame* frame,
    return FALSE;
 }
 
-gboolean cb_wv_navigation(WebKitWebView* wv, WebKitWebFrame* frame,
-      WebKitNetworkRequest* request, WebKitWebNavigationAction* action,
-      WebKitWebPolicyDecision* decision, gpointer data) {
+gboolean cb_wv_navigation(WebKitWebView* wv, WebKitWebFrame* frame, WebKitNetworkRequest* request, 
+      WebKitWebNavigationAction* action, WebKitWebPolicyDecision* decision, gpointer data) {
    switch(webkit_web_navigation_action_get_button(action)) {
       case 1: /* left mouse button */
          return FALSE;
       case 2: /* middle mouse button */
-         create_tab((char*) webkit_network_request_get_uri(request), TRUE);
+         create_tab(webkit_network_request_get_uri(request), TRUE);
          webkit_web_policy_decision_ignore(decision);
          return TRUE;
       case 3: /* right mouse button */
@@ -335,14 +337,14 @@ gboolean cb_wv_navigation(WebKitWebView* wv, WebKitWebFrame* frame,
 
 gboolean cb_wv_notify_progress(WebKitWebView* wv, GParamSpec* pspec, gpointer data) {
    if(wv == GET_CURRENT_TAB() && gtk_notebook_get_current_page(Client.UI.webview) != -1)
-      update_statusbar_info();
+      update_statusbar_info(gtk_notebook_get_current_page(Client.UI.webview));
 
    return TRUE;
 }
 
 gboolean cb_wv_notify_title(WebKitWebView* wv, GParamSpec* pspec, gpointer data) {
    if(webkit_web_view_get_title(wv)) 
-      update_client();
+      update_client(gtk_notebook_get_current_page(Client.UI.webview));
 
    return TRUE;
 }
@@ -356,6 +358,7 @@ gboolean cb_wv_load_committed(WebKitWebView* wv, WebKitWebFrame* frame, gpointer
    }
 
    run_script(buffer, NULL, NULL);
+   update_client(gtk_notebook_get_current_page(Client.UI.webview));
 
    return TRUE;
 }
@@ -364,15 +367,15 @@ gboolean cb_wv_new_window(WebKitWebView* wv, WebKitWebFrame* frame, WebKitNetwor
       WebKitWebNavigationAction* action, WebKitWebPolicyDecision* decision, gpointer data) {
    if(webkit_web_navigation_action_get_reason(action) == WEBKIT_WEB_NAVIGATION_REASON_LINK_CLICKED) {
       webkit_web_policy_decision_ignore(decision);
-      //new_window((char*) webkit_network_request_get_uri(request));
-      create_tab((char*) webkit_network_request_get_uri(request), TRUE);
+      //new_window(webkit_network_request_get_uri(request));
+      create_tab(webkit_network_request_get_uri(request), TRUE);
       return TRUE;
    }
    return FALSE;
 }
 
 gboolean cb_wv_scrolled(GtkAdjustment* adjustment, gpointer data) {
-   update_statusbar_info();
+   update_statusbar_info(gtk_notebook_get_current_page(Client.UI.webview));
    return TRUE;
 }
 

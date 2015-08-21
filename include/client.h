@@ -57,12 +57,11 @@ struct {
 //--- Function declarations -----
 void        init_client();
 
-void        close_tab(int);
-GtkWidget*  create_tab(char*, gboolean);
-void        new_window(char*);
+void        close_tab(gint);
+GtkWidget*  create_tab(const gchar*, gboolean);
+void        new_window(const gchar*);
 void        set_inputbar_visibility(gint);
-void        update_client();
-void        update_statusbar_info();
-void        update_statusbar_uri();
+void        update_client(gint);
+void        update_statusbar_info(gint);
 
 #endif

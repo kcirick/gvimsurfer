@@ -54,8 +54,8 @@ void notify(gint level, gchar* message, gboolean output_stderr, gint exit_type) 
       exit(exit_type);
 }
 
-void open_uri(WebKitWebView* web_view, gchar* uri) {
-   if(!uri) return;
+void open_uri(WebKitWebView* web_view, const gchar* uri) {
+   if(!uri || strlen(uri)==0) return;
 
    gchar* new_uri = NULL;
 
@@ -68,9 +68,11 @@ void open_uri(WebKitWebView* web_view, gchar* uri) {
       if(uri[0] == '/' || strncmp(uri, "./", 2) == 0) 
          new_uri = g_strconcat("file://", uri, NULL);
       // uri does contain any ".", ":" or "/" nor does it start with "localhost"
-      else if(!strpbrk(uri, ".:/") && strncmp(uri, "localhost", 9))
-         new_uri = g_strconcat("http://", uri, NULL);
-      else
+      else if(!strpbrk(uri, ".:/") && strncmp(uri, "localhost", 9)){
+         //new_uri = g_strconcat("http://", uri, NULL);
+         SearchEngine* se = (SearchEngine*)Client.Global.search_engines->data;
+         new_uri = g_strdup_printf(se->uri, uri);
+      } else
          new_uri = strstr(uri, "://") ? g_strdup(uri) : g_strconcat("http://", uri, NULL);
    
    } else {       // multiple arguments given
@@ -82,14 +84,17 @@ void open_uri(WebKitWebView* web_view, gchar* uri) {
       /* first agrument doesn't contain "://" -> use search engine */
       else {
          SearchEngine* se;
+         gboolean matched=FALSE;
          for(GList* list = Client.Global.search_engines; list; list = g_list_next(list)){
             se = (SearchEngine*)list->data;
-            if(g_strcmp0(args[0], se->name)==0) break;
+            if(g_strcmp0(args[0], se->name)==0){ matched=TRUE; break; }
          }
 
-         if(!se){
+         if(!matched){
             notify(WARNING, g_strdup_printf("Search engine %s doesn't exist", args[0]), FALSE, -1);
-            return;
+            se = (SearchEngine*)Client.Global.search_engines->data;
+            uri = g_strjoinv(" ", args);
+            //return;
          } else 
             uri = g_strjoinv(" ", &args[1]);
 
@@ -113,7 +118,7 @@ void open_uri(WebKitWebView* web_view, gchar* uri) {
    g_free(args);
    g_free(new_uri);
 
-   update_client();
+   update_client(gtk_notebook_get_current_page(Client.UI.webview));
 }
 
 void set_proxy(gboolean onoff) {
@@ -205,7 +210,7 @@ void run_script(char* script, char** value, char** error) {
       *value = reference_to_string(context, val);
 }
 
-void download_content(WebKitDownload* download, char* filename){
+void download_content(WebKitDownload* download, const gchar* filename){
 
    WebKitDownloadStatus status;
 
@@ -365,19 +370,19 @@ gboolean load_script(gchar* path){
    return TRUE;
 }
 
-gboolean search_and_highlight(Argument* argument) {
+void search_and_highlight(gboolean direction, gchar* token) {
    static WebKitWebView* last_wv = NULL;
    gboolean search_handle_changed = FALSE;
 
    if(!Client.Global.search_handle || !strlen(Client.Global.search_handle)){
-      if(argument->data)
-         Client.Global.search_handle = g_strdup(argument->data);
+      if(token)
+         Client.Global.search_handle = g_strdup(token);
       else
-         return FALSE;
+         return;
    }
 
-   if(argument->data && strcmp(Client.Global.search_handle, (gchar*)argument->data)!=0){
-      Client.Global.search_handle = g_strdup(argument->data);
+   if(token && strcmp(Client.Global.search_handle, token)!=0){
+      Client.Global.search_handle = g_strdup(token);
       search_handle_changed = TRUE;
    }
 
@@ -390,19 +395,30 @@ gboolean search_and_highlight(Argument* argument) {
 
       last_wv = current_wv;
    }
-   gboolean direction = (argument->n == BACKWARD) ? FALSE : TRUE;
    webkit_web_view_search_text(current_wv, Client.Global.search_handle, FALSE, direction, TRUE);
 
-   return FALSE;
 }
 
-void abort_input() {
+void clear_input() {
    run_completion(HIDE);
 
    gtk_label_set_text((GtkLabel*) Client.Statusbar.message, "");
    change_mode(NORMAL);
    gtk_widget_grab_focus(GTK_WIDGET(GET_CURRENT_TAB_WIDGET()));
    set_inputbar_visibility(HIDE);
+}
+
+gint get_int_from_buffer(gchar* buffer){
+
+   gint digit_end = 0;
+   while(g_ascii_isdigit(buffer[digit_end]))
+      digit_end = digit_end + 1;
+
+   gchar* number = g_strndup(buffer, digit_end);
+   gint id = atoi(number);
+   g_free(number);
+
+   return id;
 }
 
 gboolean sessionsave(char* session_name) {

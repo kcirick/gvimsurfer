@@ -14,15 +14,14 @@
 #include "include/client.h"
 #include "include/completion.h"
 #include "include/commands.h"
-#include "include/shortcuts.h"
 #include "include/callbacks.h"
 
 #include "config/config.h"
 #include "config/settings.h"
 
 gboolean cmd_back(int argc, char** argv) {
-   Argument argument = { BACKWARD, argc==0 ? NULL:argv[0] };
-   sc_navigate(&argument);
+   gint increment = argc==0 ? 1 : atoi(argv[0]);
+   webkit_web_view_go_back_or_forward(GET_CURRENT_TAB(), -1*increment);
 
    return TRUE;
 }
@@ -54,19 +53,20 @@ gboolean cmd_bookmark(int argc, char** argv) {
 }
 
 gboolean cmd_forward(int argc, char** argv) {
-   Argument argument = { FORWARD, argc==0 ? NULL:argv[0] };
-   sc_navigate(&argument);
+   gint increment = argc==0 ? 1 : atoi(argv[0]);
+   webkit_web_view_go_back_or_forward(GET_CURRENT_TAB(), increment);
 
    return TRUE;
 }
 
 gboolean cmd_open(int argc, char** argv) {
-  if(argc <= 0)               return TRUE;
-  if(argv[argc] != NULL)      return TRUE;
+  if(argc <= 0)            return TRUE;
+  if(argv[argc] != NULL)   return TRUE;
 
-  char* uri = g_strjoinv(" ", argv);
+  gchar* uri = g_strjoinv(" ", argv);
+  if(strlen(uri)>0)
+     open_uri(GET_CURRENT_TAB(), uri);
 
-  open_uri(GET_CURRENT_TAB(), uri);
   g_free(uri);
 
   return TRUE;
@@ -139,9 +139,7 @@ gboolean cmd_quickmark(int argc, char** argv){
 }
 
 gboolean cmd_quit(int argc, char** argv) {
-   gint current_tab = gtk_notebook_get_current_page(Client.UI.webview);
-   close_tab(current_tab);
-
+   close_tab(gtk_notebook_get_current_page(Client.UI.webview));
    return TRUE;
 }
 
@@ -151,10 +149,8 @@ gboolean cmd_quitall(int argc, char** argv) {
 }
 
 gboolean cmd_reload(int argc, char** argv) {
-   // TODO make it better
    if(argc==0){
-      Argument argument = {0, 0};
-      sc_reload(&argument);
+      webkit_web_view_reload(GET_CURRENT_TAB());
    } else if (strcmp(argv[0], "all")==0){
       int number_of_tabs = gtk_notebook_get_n_pages(Client.UI.webview);
 
@@ -168,24 +164,21 @@ gboolean cmd_saveas(int argc, char** argv) {
    
    if(argc < 2) return FALSE;
 
-   char* uri;
-   if(strcmp(argv[0], "*")==0)
-      uri = (char*) webkit_web_view_get_uri(GET_CURRENT_TAB());
-   else
-      uri = argv[0];
+   const gchar* uri = strcmp(argv[0], "*")==0 ?
+      webkit_web_view_get_uri(GET_CURRENT_TAB()) :
+      argv[0];
 
    if(!uri){
       notify(ERROR, "Could not retrieve download uri", TRUE, -1);
       return FALSE;
    }
+
    WebKitNetworkRequest* request = webkit_network_request_new(uri);
    WebKitDownload* download = webkit_download_new(request);
 
-   char* filename;
-   if(strcmp(argv[1], "*")==0)
-      filename = (char*) webkit_download_get_suggested_filename(download);
-   else
-      filename = argv[0];
+   const gchar* filename = strcmp(argv[1], "*")==0 ?
+      webkit_download_get_suggested_filename(download) :
+      argv[0];
 
    download_content(download, filename);
 
@@ -304,7 +297,7 @@ gboolean cmd_settings(int argc, char** argv) {
 
    gtk_notebook_set_show_tabs(Client.UI.webview,   show_tabbar?TRUE:FALSE);
 
-   update_client();
+   update_client(gtk_notebook_get_current_page(Client.UI.webview));
    webkit_web_view_set_settings(GET_CURRENT_TAB(), browser_settings);
    return TRUE;
 }
@@ -319,18 +312,14 @@ gboolean cmd_print(int argc, char** argv) {
 }
 
 gboolean cmd_tabopen(int argc, char** argv) {
-   if(argc <= 0)   return TRUE;
+   if(argc <= 0)           return TRUE;
+   if(argv[argc] != NULL)  return TRUE;
 
-   GString *uri = g_string_new("");
+   gchar* uri = g_strjoinv(" ", argv);
+   if(strlen(uri)>0)
+      create_tab(uri, FALSE);
 
-   uri = g_string_append(uri, argv[0]);
-   for(int i=1; i<argc; i++) {
-      uri = g_string_append_c(uri, ' ');
-      uri = g_string_append(uri, argv[i]);
-   }
-
-   create_tab(uri->str, FALSE);
-   g_string_free(uri, FALSE);
+   g_free(uri);
 
    return TRUE;
 }

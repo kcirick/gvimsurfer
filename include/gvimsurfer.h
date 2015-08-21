@@ -25,23 +25,25 @@ enum mode {
    ALL                = 0x5fffffff
 };
 
+#define FORWARD      TRUE
+#define BACKWARD     FALSE
+#define EXTERNAL     TRUE
+#define APPEND       TRUE
+#define NEW_TAB      TRUE
+#define BYPASS_CACHE TRUE
 enum { 
    SPECIFIC,
-   NEW_TAB, OPEN_EXTERNAL,
-   BACKWARD, FORWARD,
    INFO, WARNING, ERROR,
    TOGGLE, SHOW, HIDE, HIGHLIGHT,
    PREVIOUS_GROUP, PREVIOUS, NEXT, NEXT_GROUP,
    ZOOM_ORIGINAL, ZOOM_IN, ZOOM_OUT,
-   APPEND_URL,
-   BYPASS_CACHE,
-   TOP, BOTTOM, UP, DOWN, LEFT, RIGHT, FULL_UP, FULL_DOWN, MAX_LEFT, MAX_RIGHT,
-   XA_PRIMARY, XA_SECONDARY, XA_CLIPBOARD 
+   TOP, BOTTOM, UP, DOWN, LEFT, RIGHT, FULL_UP, FULL_DOWN, MAX_LEFT, MAX_RIGHT
 };
 
 typedef struct {
-   gint     n;
-   void     *data;
+   gboolean b;
+   gint     i;
+   void*    data;
 } Argument;
 
 typedef struct {
@@ -55,14 +57,14 @@ typedef struct {
 } Script;
 
 typedef struct {
-   gchar    *name;
-   gchar    *uris;
+   gchar*   name;
+   gchar*   uris;
 } Session;
 
 typedef struct {
-	gchar    *name;
-	void     *variable;
-	gchar    *webkitvar;
+	gchar*   name;
+	void*    variable;
+	gchar*   webkitvar;
    gchar    type;
 } Setting;
 

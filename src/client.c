@@ -25,8 +25,8 @@ void        init_client_data();
 void init_client() {
 
    Client.Global.mode         = NORMAL;
-   Client.Global.keymap       = gdk_keymap_get_default();      // GDK keymap
-   Client.Global.soup_session = webkit_get_default_session();  // libsoup session
+   Client.Global.keymap       = gdk_keymap_get_default();
+   Client.Global.soup_session = webkit_get_default_session();
 
    //--- Init UI -----
    Client.UI.window        = gtk_window_new(GTK_WINDOW_TOPLEVEL);
@@ -78,6 +78,7 @@ void init_client() {
    gtk_notebook_set_show_tabs(Client.UI.webview,   show_tabbar?TRUE:FALSE);
    gtk_notebook_set_scrollable(Client.UI.webview,  TRUE);
    gtk_notebook_set_show_border(Client.UI.webview, FALSE);
+   g_signal_connect(G_OBJECT(Client.UI.webview), "switch-page", G_CALLBACK(cb_notebook_switch_page), NULL);
 
    // packing
    gtk_box_pack_start(Client.UI.box, GTK_WIDGET(Client.UI.webview),  TRUE,    TRUE,    0);
@@ -108,7 +109,7 @@ void init_client() {
    // inputbar styles
    gtk_widget_modify_base(GTK_WIDGET(Client.UI.inputbar), GTK_STATE_NORMAL, &(Client.Style.statusbar_bg));
    gtk_widget_modify_text(GTK_WIDGET(Client.UI.inputbar), GTK_STATE_NORMAL, &(Client.Style.inputbar_fg));
-   gtk_widget_modify_font(GTK_WIDGET(Client.UI.inputbar),                     Client.Style.font);
+   gtk_widget_modify_font(GTK_WIDGET(Client.UI.inputbar), Client.Style.font);
    
    gtk_widget_set_size_request(GTK_WIDGET(Client.UI.inputbar),    -1, Client.Style.statusbar_height);
 
@@ -184,7 +185,7 @@ void init_client_data(){
    soup_session_add_feature(Client.Global.soup_session, (SoupSessionFeature*) cookiejar);
 }
 
-GtkWidget* create_tab(char* uri, gboolean background) {
+GtkWidget* create_tab(const gchar* uri, gboolean background) {
    if(!uri) uri = home_page;
 
    GtkWidget *tab = gtk_scrolled_window_new(NULL, NULL);
@@ -193,14 +194,13 @@ GtkWidget* create_tab(char* uri, gboolean background) {
    int number_of_tabs = gtk_notebook_get_current_page(Client.UI.webview);
    int position       = number_of_tabs + 1;
 
+   WebKitWebFrame* mf = webkit_web_view_get_main_frame(WEBKIT_WEB_VIEW(wv));
+   g_signal_connect(G_OBJECT(mf),  "scrollbars-policy-changed", G_CALLBACK(cb_blank), NULL);
+
    if(show_scrollbars)
       gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(tab), GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
-   else {
-      WebKitWebFrame* mf = webkit_web_view_get_main_frame(WEBKIT_WEB_VIEW(wv));
-      g_signal_connect(G_OBJECT(mf),  "scrollbars-policy-changed", G_CALLBACK(cb_blank), NULL);
-
+   else 
       gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(tab), GTK_POLICY_NEVER, GTK_POLICY_NEVER);
-   }
 
    //--- connect webview callbacks -----
    g_object_connect(G_OBJECT(wv),
@@ -287,7 +287,7 @@ GtkWidget * create_notebook_label( const gchar *text, GtkWidget *notebook, gint 
    return( hbox );
 }
 
-void close_tab(int tab_id) {
+void close_tab(gint tab_id) {
 
    // remove markers for this tab and update the others
    GList* list = Client.Global.pagemarks;
@@ -306,30 +306,40 @@ void close_tab(int tab_id) {
 
    if (gtk_notebook_get_n_pages(Client.UI.webview) > 1) {
       gtk_notebook_remove_page(Client.UI.webview, tab_id);
-      update_client();
+      update_client(gtk_notebook_get_current_page(Client.UI.webview));
    } else 
       cb_destroy(NULL, NULL);
 }
 
-void new_window(char* uri) {
+void new_window(const gchar* uri) {
    if(!uri)     return;
 
-   char* nargv[3] = { TARGET, uri, NULL };
-
+   gchar* nargv[3] = { TARGET, (gchar*)uri, NULL };
    g_spawn_async(NULL, nargv, NULL, G_SPAWN_SEARCH_PATH, NULL, NULL, NULL, NULL);
 }
 
-void update_client(){
+void update_client(gint tab_id){
    if(!Client.UI.webview || !gtk_notebook_get_n_pages(Client.UI.webview)) return;
 
-   update_statusbar_info();
-   update_statusbar_uri();
+   update_statusbar_info(tab_id);
 
-   // update title
-   gchar* title = g_strdup_printf("%s %s: %s", NAME, private_browsing ? "(PRIVATE)" : "", webkit_web_view_get_title(GET_CURRENT_TAB()));
+   WebKitWebView* this_wv = GET_NTH_TAB(tab_id);
+
+   //--- update uri -----
+   gchar* uri = (gchar*) webkit_web_view_get_uri(this_wv);
+
+   // check for https
+   gboolean ssl = uri ? g_str_has_prefix(uri, "https://") : FALSE;
+   GdkColor* fg = ssl ? &(Client.Style.statusbar_ssl_fg) : &(Client.Style.statusbar_fg);
+
+   gtk_widget_modify_fg(GTK_WIDGET(Client.Statusbar.uri),      GTK_STATE_NORMAL, fg);
+   gtk_label_set_text((GtkLabel*) Client.Statusbar.uri, uri);
+
+   //--- update title -----
+   gchar* title = g_strdup_printf("%s %s: %s", NAME, private_browsing ? "(PRIVATE)" : "", webkit_web_view_get_title(this_wv));
    if(title)    gtk_window_set_title(GTK_WINDOW(Client.UI.window), title);
 
-   // update tabbar
+   //--- update tabbar -----
    int number_of_tabs  = gtk_notebook_get_n_pages(Client.UI.webview);
    for(int tc = 0; tc < number_of_tabs; tc++) {
       GtkWidget* tab       = GTK_WIDGET(GET_NTH_TAB_WIDGET(tc));
@@ -354,9 +364,9 @@ void update_client(){
    }
 }
 
-void update_statusbar_info() {
-   if (gtk_notebook_get_current_page(Client.UI.webview) == -1)
-      return;
+void update_statusbar_info(gint tab_id) {
+
+   WebKitWebView* this_wv = GET_NTH_TAB(tab_id);
 
    GString *status = g_string_new("");
 
@@ -364,15 +374,15 @@ void update_statusbar_info() {
    {
       // check for possible navigation
       GString* navigation = g_string_new("");
-      g_string_append_c(navigation, webkit_web_view_can_go_back(GET_CURRENT_TAB())?'<':'-');
-      g_string_append_c(navigation, webkit_web_view_can_go_forward(GET_CURRENT_TAB())?'>':'-');
+      g_string_append_c(navigation, webkit_web_view_can_go_back(this_wv)?'<':'-');
+      g_string_append_c(navigation, webkit_web_view_can_go_forward(this_wv)?'>':'-');
 
       g_string_append_printf(status, " [%s]\t", navigation->str);
       g_string_free(navigation, TRUE);
 
       //page load status
       gint progress = -1;
-      progress = webkit_web_view_get_progress(GET_CURRENT_TAB())*100;
+      progress = webkit_web_view_get_progress(this_wv)*100;
       if(progress>0)
          g_string_append_printf(status, "[%d%%]\t", progress);
 
@@ -391,7 +401,7 @@ void update_statusbar_info() {
    }
 
    // update position
-   GtkAdjustment* adjustment = gtk_scrolled_window_get_vadjustment(GET_CURRENT_TAB_WIDGET());
+   GtkAdjustment* adjustment = gtk_scrolled_window_get_vadjustment(GET_NTH_TAB_WIDGET(tab_id));
    gdouble view_size         = gtk_adjustment_get_page_size(adjustment);
    gdouble value             = gtk_adjustment_get_value(adjustment);
    gdouble max               = gtk_adjustment_get_upper(adjustment) - view_size;
@@ -409,19 +419,6 @@ void update_statusbar_info() {
 
    g_string_free(status, TRUE);
    g_free(position);
-}
-
-void update_statusbar_uri() {
-   gchar* link  = (gchar*) webkit_web_view_get_uri(GET_CURRENT_TAB());
-   gchar* uri = link?g_strdup_printf("%s", link):"[NULL]";
-
-   /* check for https */
-   gboolean ssl = link ? g_str_has_prefix(link, "https://") : FALSE;
-   GdkColor* fg = ssl ? &(Client.Style.statusbar_ssl_fg) : &(Client.Style.statusbar_fg);
-
-   gtk_widget_modify_fg(GTK_WIDGET(Client.Statusbar.uri),      GTK_STATE_NORMAL, fg);
-   gtk_label_set_text((GtkLabel*) Client.Statusbar.uri, uri);
-   //g_free(uri);
 }
 
 void set_inputbar_visibility(gint visibility){

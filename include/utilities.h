@@ -7,15 +7,16 @@
 
 void        notify(gint, gchar*, gboolean, gint);
 
-void        abort_input();
+void        clear_input();
 gchar*      build_proper_path(gchar*);
 void        change_mode(int);
-void        download_content(WebKitDownload*, char*);
+void        download_content(WebKitDownload*, const gchar*);
+gint        get_int_from_buffer(gchar*);
 gboolean    load_script(gchar*);
-void        open_uri(WebKitWebView*, gchar*);
+void        open_uri(WebKitWebView*, const gchar*);
 gboolean    read_configuration(gchar*);
 void        run_script(char*, char**, char**);
-gboolean    search_and_highlight(Argument*);
+void        search_and_highlight(gboolean, gchar*);
 gboolean    sessionload(char*);
 gboolean    sessionsave(char*);
 void        set_proxy(gboolean);

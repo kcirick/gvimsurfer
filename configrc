@@ -37,7 +37,7 @@ history        = history
 cookies        = cookies
 sessions       = sessions
 stylesheet     = style.css
-scriptfile     = hinting.js
+scriptfile     = script.js
 
 #--- Search engines -----
 search_engine  = google http://google.com/search?q=%s
