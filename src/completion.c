@@ -36,7 +36,7 @@ void              cr_set_color(GtkBox*, int, int);
 //--- Completion -----
 Completion* completion_init() {
    Completion *completion = malloc(sizeof(Completion));
-   if(!completion)   notify(ERROR, "Out of memory", TRUE, EXIT_FAILURE);
+   if(!completion)   die(ERROR, "Out of memory", EXIT_FAILURE);
 
    completion->groups = NULL;
 
@@ -103,7 +103,7 @@ void cg_add_element(CompletionGroup* group, char* name) {
 
 CompletionGroup* cg_create(char* name) {
    CompletionGroup* group = malloc(sizeof(CompletionGroup));
-   if(!group)      notify(ERROR, "Out of memory", TRUE, EXIT_FAILURE);
+   if(!group)      die(ERROR, "Out of memory", EXIT_FAILURE);
 
    group->value    = name;
    group->elements = NULL;
@@ -284,7 +284,7 @@ void run_completion(gint arg) {
          }
 
          rows = malloc(sizeof(CompletionRow));
-         if(!rows) notify(ERROR, "Out of memory", TRUE, EXIT_FAILURE);
+         if(!rows) die(ERROR, "Out of memory", EXIT_FAILURE);
 
          for(GList* grlist = result->groups; grlist; grlist = g_list_next(grlist)) {
             CompletionGroup* group = (CompletionGroup*)grlist->data;
@@ -316,7 +316,7 @@ void run_completion(gint arg) {
       else {
 
          rows = malloc(LENGTH(commands) * sizeof(CompletionRow));
-         if(!rows)   notify(ERROR, "Out of memory", TRUE, EXIT_FAILURE);
+         if(!rows)   die(ERROR, "Out of memory", EXIT_FAILURE);
 
          for(unsigned int i = 0; i < LENGTH(commands); i++) {
             int cmd_length  = commands[i].command ? strlen(commands[i].command) : 0;

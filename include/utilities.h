@@ -5,7 +5,8 @@
 #ifndef UTILITIES_H
 #define UTILITIES_H
 
-void        notify(gint, gchar*, gboolean, gint);
+void        notify(gint, gchar*);
+void        die(gint, gchar*, gint);
 
 void        clear_input();
 gchar*      build_proper_path(gchar*);

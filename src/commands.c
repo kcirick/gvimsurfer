@@ -52,6 +52,26 @@ gboolean cmd_bookmark(int argc, char** argv) {
    return TRUE;
 }
 
+gboolean cmd_cancel_download(int argc, char** argv){
+
+   if(argc<1) return FALSE;
+
+   gint which = atoi(argv[0]);
+
+   WebKitDownload* this_download = (WebKitDownload*)g_list_nth_data(Client.Global.active_downloads, which);
+
+   if(!this_download){
+      notify(WARNING, "No such download!");
+      return FALSE;
+   }
+
+   webkit_download_cancel(this_download);
+
+   notify(INFO, "Download cancelled");
+
+   return TRUE;
+}
+
 gboolean cmd_forward(int argc, char** argv) {
    gint increment = argc==0 ? 1 : atoi(argv[0]);
    webkit_web_view_go_back_or_forward(GET_CURRENT_TAB(), increment);
@@ -169,7 +189,7 @@ gboolean cmd_saveas(int argc, char** argv) {
       argv[0];
 
    if(!uri){
-      notify(ERROR, "Could not retrieve download uri", TRUE, -1);
+      notify(ERROR, "Could not retrieve download uri");
       return FALSE;
    }
 

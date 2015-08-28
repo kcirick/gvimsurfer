@@ -84,9 +84,9 @@ gboolean cb_download_progress(WebKitDownload* d, GParamSpec* pspec){
 
    if (status != WEBKIT_DOWNLOAD_STATUS_STARTED && status != WEBKIT_DOWNLOAD_STATUS_CREATED) {
       if (status != WEBKIT_DOWNLOAD_STATUS_FINISHED)
-         notify(ERROR, g_strdup_printf("Error while downloading %s", webkit_download_get_suggested_filename(d)), FALSE, -1);
+         notify(ERROR, g_strdup_printf("Error while downloading %s", webkit_download_get_suggested_filename(d)));
       else
-         notify(INFO, g_strdup_printf("Download %s finished", webkit_download_get_suggested_filename(d)), FALSE, -1);
+         notify(INFO, g_strdup_printf("Download %s finished", webkit_download_get_suggested_filename(d)));
       Client.Global.active_downloads = g_list_remove(Client.Global.active_downloads, d);
    }
    update_statusbar_info(gtk_notebook_get_current_page(Client.UI.webview));
@@ -130,12 +130,14 @@ gboolean cb_inputbar_activate(GtkEntry* entry, gpointer data) {
       }
    }
 
-   if(!succ) notify(ERROR, "Unknown command.", FALSE, -1);
+   if(!succ) notify(ERROR, "Unknown command");
 
    if(retv) clear_input();
    else     set_inputbar_visibility(HIDE); 
 
    g_strfreev(tokens);
+
+   gtk_widget_grab_focus(GTK_WIDGET(GET_CURRENT_TAB_WIDGET()));
    
    return TRUE;
 }
@@ -353,7 +355,7 @@ gboolean cb_wv_load_committed(WebKitWebView* wv, WebKitWebFrame* frame, gpointer
 
    gchar *buffer = Client.Global.user_script->content;
    if(!buffer){
-      notify(WARNING, "No script loaded", FALSE, -1);
+      notify(WARNING, "No script loaded");
       return FALSE;
    }
 

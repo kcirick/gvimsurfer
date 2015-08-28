@@ -37,6 +37,8 @@ void sc_abort(Argument* argument) {
    // Unmark search results
    webkit_web_view_unmark_text_matches(GET_CURRENT_TAB());
 
+   // reset the statubar message fg colour 
+   gtk_widget_modify_fg(GTK_WIDGET(Client.Statusbar.message), GTK_STATE_NORMAL, &(Client.Style.statusbar_fg));
    gtk_widget_grab_focus(GTK_WIDGET(GET_CURRENT_TAB_WIDGET()));
 }
 
@@ -53,7 +55,7 @@ void sc_copy_uri(Argument* argument) {
    gchar* uri = (gchar*) webkit_web_view_get_uri(GET_CURRENT_TAB());
    gtk_clipboard_set_text(gtk_clipboard_get(GDK_SELECTION_PRIMARY), uri, -1);
 
-   notify(INFO, g_strdup_printf("Copied %s", uri), FALSE, -1);
+   notify(INFO, g_strdup_printf("Copied %s", uri));
 }
 
 void sc_focus_input(Argument* argument){

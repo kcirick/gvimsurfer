@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include <gtk/gtk.h>
+#include <glib/gprintf.h>
 #include <webkit/webkit.h>
 #include <JavaScriptCore/JavaScript.h>
 
@@ -20,14 +21,15 @@
 #define COLOUR_RED     "\x1b[31m"
 #define COLOUR_GREEN   "\x1b[32m"
 #define COLOUR_YELLOW  "\x1b[33m"
+#define COLOUR_PURPLE  "\x1b[35m"
 #define COLOUR_RESET   "\x1b[0m"
 
 //--- Function declaration -----
 char* reference_to_string(JSContextRef, JSValueRef);
 
 
-void notify(gint level, gchar* message, gboolean output_stderr, gint exit_type) {
-   if(!message || strlen(message) <= 0) return;
+void notify(gint level, gchar* message) {
+   gboolean output_stderr=FALSE; // set to TRUE for debugging
 
    if(Client.UI.window){
       if(level==ERROR || level==WARNING)
@@ -41,14 +43,30 @@ void notify(gint level, gchar* message, gboolean output_stderr, gint exit_type) 
    if(!Client.UI.window || output_stderr){
       gchar* coloured_type;
       if(level==ERROR)   
-         coloured_type=g_strdup_printf(COLOUR_RED "%s" COLOUR_RESET, "ERROR");
+         coloured_type=g_strdup(COLOUR_RED "ERROR" COLOUR_RESET);
       else if(level==WARNING)
-         coloured_type=g_strdup_printf(COLOUR_YELLOW "%s" COLOUR_RESET, "WARNING");
+         coloured_type=g_strdup(COLOUR_YELLOW "WARNING" COLOUR_RESET);
+      else if(level==DEBUG)
+         coloured_type=g_strdup(COLOUR_PURPLE "DEBUG" COLOUR_RESET);
       else
-         coloured_type=g_strdup_printf(COLOUR_GREEN "%s" COLOUR_RESET, "INFO");
+         coloured_type=g_strdup(COLOUR_GREEN "INFO" COLOUR_RESET);
 
-      fprintf(stderr, "%s [%s]:\t%s\n", NAME, coloured_type, message);
+      g_printf("%s [%s]:\t%s\n", NAME, coloured_type, message);
    }
+}
+
+void die(gint level, gchar* message, gint exit_type) {
+   gchar* coloured_type;
+   if(level==ERROR)   
+      coloured_type=g_strdup(COLOUR_RED "ERROR" COLOUR_RESET);
+   else if(level==WARNING)
+      coloured_type=g_strdup(COLOUR_YELLOW "WARNING" COLOUR_RESET);
+   else if(level==DEBUG)
+      coloured_type=g_strdup(COLOUR_PURPLE "DEBUG" COLOUR_RESET);
+   else
+      coloured_type=g_strdup(COLOUR_GREEN "INFO" COLOUR_RESET);
+
+   g_printf("%s [%s]:\t%s\n", NAME, coloured_type, message);
 
    if(exit_type==EXIT_SUCCESS || exit_type==EXIT_FAILURE ) 
       exit(exit_type);
@@ -91,7 +109,7 @@ void open_uri(WebKitWebView* web_view, const gchar* uri) {
          }
 
          if(!matched){
-            notify(WARNING, g_strdup_printf("Search engine %s doesn't exist", args[0]), FALSE, -1);
+            notify(WARNING, g_strdup_printf("Search engine %s doesn't exist", args[0]));
             se = (SearchEngine*)Client.Global.search_engines->data;
             uri = g_strjoinv(" ", args);
             //return;
@@ -127,13 +145,13 @@ void set_proxy(gboolean onoff) {
    if(!onoff) {
       g_object_set(Client.Global.soup_session, "proxy-uri", NULL, NULL);
 
-      notify(INFO, "Proxy deactivated", FALSE, -1);
+      notify(INFO, "Proxy deactivated");
    } else {
       filename = (char*) g_getenv("http_proxy");
       if(filename==NULL)   filename = (char*) g_getenv("HTTP_PROXY");
 
       if(filename==NULL) {
-         notify(WARNING, "No proxy defined", FALSE, -1);
+         notify(WARNING, "No proxy defined");
          return;
       }
 
@@ -145,7 +163,7 @@ void set_proxy(gboolean onoff) {
       soup_uri_free(proxy_uri);
       g_free(new);
 
-      notify(INFO, "Proxy activated", FALSE, -1);
+      notify(INFO, "Proxy activated");
    }
 }
 
@@ -221,9 +239,9 @@ void download_content(WebKitDownload* download, const gchar* filename){
 
    uint32_t size = (uint32_t)webkit_download_get_total_size(download);
    if(size>0)
-      notify(INFO, g_strdup_printf("Download %s started (expected size: %u bytes)...", filename, size), FALSE, -1);
+      notify(INFO, g_strdup_printf("Download %s started (expected size: %u bytes)...", filename, size));
    else
-      notify(INFO, g_strdup_printf("Download %s started (unknown size)...", filename), FALSE, -1);
+      notify(INFO, g_strdup_printf("Download %s started (unknown size)...", filename));
 
    Client.Global.active_downloads = g_list_prepend(Client.Global.active_downloads, download);
    g_signal_connect(download, "notify::progress", G_CALLBACK(cb_download_progress), NULL);
@@ -240,7 +258,7 @@ gchar* build_proper_path(gchar* path){
    if(path[0]=='~')        proper_path = g_build_filename(g_get_home_dir(), path+1, NULL);
    else if(path[0]=='/')   proper_path = g_strdup(path);
    else {
-      notify(WARNING, g_strdup_printf("Path %s is vague", path), FALSE, -1);
+      notify(WARNING, g_strdup_printf("Path %s is vague", path));
       proper_path = g_strdup(path);
    }
 
@@ -300,7 +318,7 @@ gboolean read_configuration(gchar* configrc) {
       if(!strcmp(id, "search_engine")){
          gchar **entries = g_strsplit_set(value, " ", -1);
          gint    num_entries = g_strv_length(entries);
-         if(num_entries !=2) notify(WARNING, "Numbers of entries is not 2!", TRUE, -1);
+         if(num_entries !=2) notify(WARNING, "Numbers of entries is not 2!");
          
          SearchEngine* sengine = malloc(sizeof(SearchEngine));
          sengine->name = entries[0];
@@ -316,7 +334,7 @@ gboolean read_configuration(gchar* configrc) {
       if(!strcmp(id, "statusbar_color")){
          gchar   **colors  = g_strsplit_set(value, " ", -1);
          gint   num_colors = g_strv_length(colors);
-         if(num_colors !=5) notify(WARNING, "Numbers of colors is not 5!", TRUE, -1);
+         if(num_colors !=5) notify(WARNING, "Numbers of colors is not 5!");
          
          gdk_color_parse(colors[0],    &(Client.Style.statusbar_bg));
          gdk_color_parse(colors[1],    &(Client.Style.statusbar_fg));
@@ -328,7 +346,7 @@ gboolean read_configuration(gchar* configrc) {
       if(!strcmp(id, "completion_color")){
          gchar    **colors = g_strsplit_set(value, " ", -1);
          gint   num_colors = g_strv_length(colors);
-         if(num_colors !=3) notify(WARNING, "Numbers of colors is not 3!", TRUE, -1);
+         if(num_colors !=3) notify(WARNING, "Numbers of colors is not 3!");
          
          gdk_color_parse(colors[0],    &(Client.Style.completion_bg));
          gdk_color_parse(colors[1],    &(Client.Style.completion_fg));
@@ -348,7 +366,7 @@ gboolean load_script(gchar* path){
 
    char* content = NULL;
    if(!g_file_get_contents(file, &content, NULL, NULL)){
-      notify(ERROR, g_strdup_printf("Could not open or read file '%s'", path), TRUE, -1);
+      notify(ERROR, g_strdup_printf("Could not open or read file '%s'", path));
       return FALSE;
    }
 
@@ -362,7 +380,7 @@ gboolean load_script(gchar* path){
 
    // load new script
    Client.Global.user_script = malloc(sizeof(Script));
-   if(!Client.Global.user_script) notify(ERROR, "Out of memory", TRUE, EXIT_FAILURE);
+   if(!Client.Global.user_script) die(ERROR, "Out of memory", EXIT_FAILURE);
 
    Client.Global.user_script->path    = path;
    Client.Global.user_script->content = content;

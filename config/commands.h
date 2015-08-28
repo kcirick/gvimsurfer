@@ -11,6 +11,7 @@ static const Command commands[] = {
   {"back",     cmd_back,         0 },              // Go back in history
   {"forward",  cmd_forward,      0 },              // Go forward in history
   {"bmark",    cmd_bookmark,     0 },              // Add bookmark
+  {"cancel",   cmd_cancel_download, 0},            // Cancel download
   {"qmark",    cmd_quickmark,    0 },              // Set quickmark
   {"pmark",    cmd_pagemark,     0 },              // Set pagemark
   {"e",        cmd_open,         cc_open },        // Open URI in current tab
