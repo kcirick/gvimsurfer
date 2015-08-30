@@ -26,6 +26,7 @@ void init_client() {
 
    Client.Global.mode         = NORMAL;
    Client.Global.keymap       = gdk_keymap_get_default();
+   Client.Global.soup_session = webkit_get_default_session();
 
    //--- Init UI -----
    Client.UI.window        = gtk_window_new(GTK_WINDOW_TOPLEVEL);
@@ -178,7 +179,12 @@ void init_client_data(){
          g_free(lines);
       }
    }
+   // load cookies
+   SoupCookieJar *cookiejar = soup_cookie_jar_text_new(cookies, FALSE);
+   soup_session_add_feature(Client.Global.soup_session, (SoupSessionFeature*) cookiejar);
 
+   g_object_set(G_OBJECT(Client.Global.soup_session), "ssl-use-system-ca-file", TRUE, NULL);
+   g_object_set(G_OBJECT(Client.Global.soup_session), "ssl-strict", strict_ssl, NULL);
 }
 
 GtkWidget* create_tab(const gchar* uri, gboolean background) {
@@ -207,6 +213,7 @@ GtkWidget* create_tab(const gchar* uri, gboolean background) {
          "signal::hovering-over-link",                   G_CALLBACK(cb_wv_hover_link),       NULL,
          "signal::key-press-event",                      G_CALLBACK(cb_wv_kb_pressed),       NULL,
          "signal::load-committed",                       G_CALLBACK(cb_wv_load_committed),   NULL,
+         "signal::load-finished",                        G_CALLBACK(cb_wv_load_finished),    NULL,
          "signal::load-progress-changed",                G_CALLBACK(cb_wv_notify_progress),  NULL,
          "signal::mime-type-policy-decision-requested",  G_CALLBACK(cb_wv_mime_type),        NULL,
          "signal::navigation-policy-decision-requested", G_CALLBACK(cb_wv_navigation),       NULL,
@@ -224,25 +231,18 @@ GtkWidget* create_tab(const gchar* uri, gboolean background) {
 
    Page* page           = malloc(sizeof(Page));
    page->wv             = wv;
-   page->soup_session   = webkit_get_default_session();
    page->pagemarks      = NULL; 
 
-   // load cookies
-   SoupCookieJar *cookiejar = soup_cookie_jar_text_new(cookies, FALSE);
-   soup_session_add_feature(page->soup_session, (SoupSessionFeature*) cookiejar);
-   
    /////
    /* apply browser setting */
    WebKitWebSettings *settings = (WebKitWebSettings*)webkit_web_settings_new();
 
    gchar *file_url = g_strconcat("file://", stylesheet, NULL);
-   gboolean enablePlugins = TRUE;
    gboolean enableScripts = TRUE;
+   gboolean enablePlugins = TRUE;
    gboolean enableJava = TRUE;
    gboolean enablePagecache = FALSE;
 
-   g_object_set(G_OBJECT(page->soup_session), "ssl-use-system-ca-file", TRUE, NULL);
-   g_object_set(G_OBJECT(page->soup_session), "ssl-strict", strict_ssl, NULL);
    g_object_set(G_OBJECT(settings), "enable-scripts", enableScripts, NULL);
    g_object_set(G_OBJECT(settings), "enable-plugins", enablePlugins, NULL);
    g_object_set(G_OBJECT(settings), "enable-java-applet", enableJava, NULL);
@@ -250,7 +250,7 @@ GtkWidget* create_tab(const gchar* uri, gboolean background) {
    g_object_set(G_OBJECT(settings), "user-stylesheet-uri", file_url, NULL);
    g_object_set(G_OBJECT(settings), "user-agent", user_agent, NULL);
    webkit_web_view_set_settings(wv, settings);
-
+   
    GtkWidget* label = create_notebook_label("", GTK_WIDGET(Client.UI.webview), position);
 
    gtk_container_add(GTK_CONTAINER(tab), GTK_WIDGET(wv));
@@ -300,7 +300,6 @@ void close_tab(gint tab_id) {
       free(list->data);
    g_list_free(page->pagemarks);
 
-   soup_session_abort(page->soup_session);
    Client.Global.pages = g_list_remove(Client.Global.pages, page);
    g_free(page);
 

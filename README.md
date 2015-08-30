@@ -11,8 +11,8 @@ Web browser that looks and works like gVim
    - gtk+-2
    - webkit-1.0
    - libsoup 
-  - Not meant to be installed but compiled to a local folder (eg. $HOME/.local/bin)
-   - All configuration is stored under $HOME/.config/gvimsurfer (run the setup script to create it)
+  - ~~Not meant to be installed but compiled to a local folder (eg. $HOME/.local/bin)~~
+  - All configuration is stored under $HOME/.config/gvimsurfer (run the setup script to create it)
 
 
 ## Installation:
@@ -33,12 +33,12 @@ Web browser that looks and works like gVim
 
 ## Version Log:
 
-  - 0.3 (Work-in-progress):
+  - 0.3 (2015-08-30):
    - Correctly updates when clicking on tabs
    - Split "open" command to "open" and "history":
      - "open" will open search engine and bookmarks completion list
      - "history" will open history completion list
-   - Each page has its own pagemark and soup session (previously all one giant session)
+   - Each page has its own pagemark ~~and soup session~~ (previously all one giant session)
    - Fix several seg faults and weird crashes
    - General code clean-up
   - 0.2 (2015-08-19):
@@ -52,5 +52,6 @@ Web browser that looks and works like gVim
 ## To do / Known issues:
 
   - WISHLIST: Implement adblock
-
+  - TODO: Make install/uninstall routine to Makefile
+  - TODO: Code cleanup
 

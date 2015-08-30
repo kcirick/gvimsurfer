@@ -106,34 +106,15 @@ void open_uri(WebKitWebView* web_view, const gchar* uri) {
    } 
    webkit_web_view_load_uri(web_view, new_uri);
 
-   // replace space with '+' for history
-   for(int i=0; i<strlen(new_uri); i++){
-      if(new_uri[i]==' ') new_uri[i]='+';
-   }
-
-   // update history
-   if(!private_browsing) {
-      /* we verify if the new_uri is already present in the list*/
-      GList* l = g_list_find_custom(Client.Global.history, new_uri, (GCompareFunc)strcmp);
-      if (l) {
-         /* new_uri is already present : move it to the end of the list */
-         Client.Global.history = g_list_remove_link(Client.Global.history, l);
-         Client.Global.history = g_list_concat(l, Client.Global.history);
-      } else 
-         Client.Global.history = g_list_prepend(Client.Global.history, g_strdup(new_uri));
-   }
-   g_free(args);
+   g_strfreev(args);
    g_free(new_uri);
-
-   update_client(gtk_notebook_get_current_page(Client.UI.webview));
 }
 
 void set_proxy(gboolean onoff) {
    gchar   *filename, *new;
-   Page* page = get_current_page();
 
    if(!onoff) {
-      g_object_set(page->soup_session, "proxy-uri", NULL, NULL);
+      g_object_set(Client.Global.soup_session, "proxy-uri", NULL, NULL);
 
       notify(INFO, "Proxy deactivated");
    } else {
@@ -148,7 +129,7 @@ void set_proxy(gboolean onoff) {
       new = g_strrstr(filename, "://") ? g_strdup(filename) : g_strconcat("http://", filename, NULL);
       SoupURI* proxy_uri = soup_uri_new(new);
 
-      g_object_set(page->soup_session, "proxy-uri", proxy_uri, NULL);
+      g_object_set(Client.Global.soup_session, "proxy-uri", proxy_uri, NULL);
 
       soup_uri_free(proxy_uri);
       g_free(new);

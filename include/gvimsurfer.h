@@ -69,9 +69,7 @@ typedef struct {
 } Setting;
 
 typedef struct {
-   gint           tab_id;
    WebKitWebView  *wv;
-   SoupSession    *soup_session;
    GList          *pagemarks;
 } Page;
    

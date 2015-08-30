@@ -317,6 +317,7 @@ gboolean cb_wv_mime_type(WebKitWebView* wv, WebKitWebFrame* frame, WebKitNetwork
 
 gboolean cb_wv_navigation(WebKitWebView* wv, WebKitWebFrame* frame, WebKitNetworkRequest* request, 
       WebKitWebNavigationAction* action, WebKitWebPolicyDecision* decision, gpointer data) {
+
    switch(webkit_web_navigation_action_get_button(action)) {
       case 1: /* left mouse button */
          return FALSE;
@@ -352,8 +353,31 @@ gboolean cb_wv_load_committed(WebKitWebView* wv, WebKitWebFrame* frame, gpointer
       notify(WARNING, "No script loaded");
       return FALSE;
    }
-
    run_script(buffer, NULL, NULL);
+
+   return TRUE;
+}
+
+gboolean cb_wv_load_finished(WebKitWebView *wv, WebKitWebFrame* frame, gpointer user_data){
+
+   gchar* uri = (gchar*) webkit_web_view_get_uri(wv);
+
+   //--- Update history -----
+   // replace space with '+' for history
+   //for(int i=0; i<strlen(uri); i++)
+   //   if(uri[i]==' ') uri[i]='+';
+
+   if(!private_browsing) {
+      // we verify if the new_uri is already present in the list
+      GList* l = g_list_find_custom(Client.Global.history, uri, (GCompareFunc)strcmp);
+      if (l) {
+         // new_uri is already present -> move it to the end of the list
+         Client.Global.history = g_list_remove_link(Client.Global.history, l);
+         Client.Global.history = g_list_concat(l, Client.Global.history);
+      } else 
+         Client.Global.history = g_list_prepend(Client.Global.history, g_strdup(uri));
+   }
+
    update_client(gtk_notebook_get_current_page(Client.UI.webview));
 
    return TRUE;

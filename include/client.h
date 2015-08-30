@@ -43,6 +43,7 @@ struct {
       gchar       *search_handle;
       Script      *user_script;
       GdkKeymap   *keymap;
+      SoupSession *soup_session;
    } Global;
 
    struct {

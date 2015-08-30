@@ -1,7 +1,7 @@
 #!/bin/bash
 
 REFRESH=$1
-GVIMSURFER_DIR=$HOME/.config/gvimsurfer2
+GVIMSURFER_DIR=$HOME/.config/gvimsurfer
 
 if [ $REFRESH ]; then
    echo "Starting all over again"

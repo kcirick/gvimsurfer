@@ -32,5 +32,7 @@ gboolean    cb_wv_new_window(WebKitWebView*, WebKitWebFrame*, WebKitNetworkReque
       WebKitWebNavigationAction*, WebKitWebPolicyDecision*, gpointer);
 gboolean    cb_wv_scrolled(GtkAdjustment*, gpointer);
 gboolean    cb_wv_load_committed(WebKitWebView*, WebKitWebFrame*, gpointer);
+gboolean    cb_wv_load_finished(WebKitWebView*, WebKitWebFrame*, gpointer);
+
 
 #endif

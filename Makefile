@@ -19,6 +19,7 @@ CFLAGS += -DVERSION=\"$(VERSION)\" -D_XOPEN_SOURCE=600 -DTARGET=\"$(TARGET)\" -D
 all: ${TARGET}
 
 obj/%.o : src/%.c
+	@if [ ! -d obj/ ]; then mkdir -p obj/; fi
 	@echo " CC " $<
 	@${CC} -c ${CFLAGS} -o $@ $<
 
@@ -33,11 +34,22 @@ clean:
 	@rm -f ${TARGET}
 	@echo " RM " ${OBJ}
 	@rm -f ${OBJ}
+	@rm -rf obj/
 
 info:
 	@echo ${TARGET} build options:
 	@echo "CC      = ${CC}"
 	@echo "CFLAGS  = ${CFLAGS}"
 	@echo "LIBS    = ${LFLAGS}"
+
+install: all
+	@echo installing...
+	@mkdir -p ${DESTDIR}${PREFIX}/bin
+	@cp -f ${TARGET} ${DESTDIR}${PREFIX}/bin
+	@chmod 755 ${DESTDIR}${PREFIX}/bin/${TARGET}
+
+uninstall:
+	@echo uninstalling...
+	@rm -f ${DESKDIR}${PREFIX}/bin/${TARGET}
 
 .PHONY: all clean info

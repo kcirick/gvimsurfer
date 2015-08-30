@@ -25,8 +25,7 @@ void sc_abort(Argument* argument) {
    run_script(cmd, NULL, NULL);
 
    // Stop loading website
-   if(webkit_web_view_get_progress(GET_CURRENT_TAB()) == 1.0)
-      webkit_web_view_stop_loading(GET_CURRENT_TAB());
+   webkit_web_view_stop_loading(GET_CURRENT_TAB());
 
    // Set back to normal mode
    change_mode(NORMAL);
@@ -198,6 +197,7 @@ void sc_go_parent(Argument* argument) {
 
 void sc_navigate(Argument* argument) {
    webkit_web_view_go_back_or_forward(GET_CURRENT_TAB(), argument->b?1:-1);
+   gtk_widget_grab_focus(GTK_WIDGET(GET_CURRENT_TAB_WIDGET()));
 }
 
 void sc_navigate_tabs(Argument* argument) {
@@ -253,8 +253,7 @@ void sc_paste(Argument* argument) {
 void sc_quickmark(Argument* argument) {
    gint id = get_int_from_buffer(Client.Global.buffer->str);
 
-   GList* list;
-   for(list = Client.Global.quickmarks; list; list = g_list_next(list)) {
+   for(GList* list = Client.Global.quickmarks; list; list = g_list_next(list)) {
       QMark* qmark = (QMark*) list->data;
 
       if(qmark->id == id) {
