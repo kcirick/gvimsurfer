@@ -26,7 +26,6 @@ void init_client() {
 
    Client.Global.mode         = NORMAL;
    Client.Global.keymap       = gdk_keymap_get_default();
-   Client.Global.soup_session = webkit_get_default_session();
 
    //--- Init UI -----
    Client.UI.window        = gtk_window_new(GTK_WINDOW_TOPLEVEL);
@@ -180,9 +179,6 @@ void init_client_data(){
       }
    }
 
-   // load cookies
-   SoupCookieJar *cookiejar = soup_cookie_jar_text_new(cookies, FALSE);
-   soup_session_add_feature(Client.Global.soup_session, (SoupSessionFeature*) cookiejar);
 }
 
 GtkWidget* create_tab(const gchar* uri, gboolean background) {
@@ -226,6 +222,15 @@ GtkWidget* create_tab(const gchar* uri, gboolean background) {
    /* set default values */
    g_object_set(G_OBJECT(wv), "full-content-zoom", full_content_zoom, NULL);
 
+   Page* page           = malloc(sizeof(Page));
+   page->wv             = wv;
+   page->soup_session   = webkit_get_default_session();
+   page->pagemarks      = NULL; 
+
+   // load cookies
+   SoupCookieJar *cookiejar = soup_cookie_jar_text_new(cookies, FALSE);
+   soup_session_add_feature(page->soup_session, (SoupSessionFeature*) cookiejar);
+   
    /////
    /* apply browser setting */
    WebKitWebSettings *settings = (WebKitWebSettings*)webkit_web_settings_new();
@@ -236,9 +241,8 @@ GtkWidget* create_tab(const gchar* uri, gboolean background) {
    gboolean enableJava = TRUE;
    gboolean enablePagecache = FALSE;
 
-   Client.Global.soup_session = webkit_get_default_session();
-   g_object_set(G_OBJECT(Client.Global.soup_session), "ssl-use-system-ca-file", TRUE, NULL);
-   g_object_set(G_OBJECT(Client.Global.soup_session), "ssl-strict", strict_ssl, NULL);
+   g_object_set(G_OBJECT(page->soup_session), "ssl-use-system-ca-file", TRUE, NULL);
+   g_object_set(G_OBJECT(page->soup_session), "ssl-strict", strict_ssl, NULL);
    g_object_set(G_OBJECT(settings), "enable-scripts", enableScripts, NULL);
    g_object_set(G_OBJECT(settings), "enable-plugins", enablePlugins, NULL);
    g_object_set(G_OBJECT(settings), "enable-java-applet", enableJava, NULL);
@@ -252,6 +256,8 @@ GtkWidget* create_tab(const gchar* uri, gboolean background) {
    gtk_container_add(GTK_CONTAINER(tab), GTK_WIDGET(wv));
    gtk_widget_show_all(tab);
    gtk_notebook_insert_page(Client.UI.webview, tab, label, position);
+
+   Client.Global.pages = g_list_append(Client.Global.pages, page);
 
    if(!background)
       gtk_notebook_set_current_page(Client.UI.webview, position);
@@ -289,18 +295,14 @@ GtkWidget * create_notebook_label( const gchar *text, GtkWidget *notebook, gint 
 
 void close_tab(gint tab_id) {
 
-   // remove markers for this tab and update the others
-   GList* list = Client.Global.pagemarks;
-   while (list) {
-      PMark* pmark = (PMark*) list->data;
-      if (pmark->tab_id == tab_id) {
-         Client.Global.pagemarks = g_list_delete_link(Client.Global.pagemarks, list);
-         free(pmark);
-      } else if (pmark->tab_id > tab_id) {
-         pmark->tab_id -= 1;
-      }
-      list = g_list_next(list);
-   }
+   Page* page = get_current_page();
+   for(GList* list = page->pagemarks; list; list = g_list_next(list))
+      free(list->data);
+   g_list_free(page->pagemarks);
+
+   soup_session_abort(page->soup_session);
+   Client.Global.pages = g_list_remove(Client.Global.pages, page);
+   g_free(page);
 
    Client.Global.last_closed = g_strdup((gchar *) webkit_web_view_get_uri(GET_CURRENT_TAB()));
 

@@ -67,12 +67,6 @@ gboolean cb_destroy(GtkWidget* widget, gpointer data) {
 
    g_list_free(Client.Global.quickmarks);
 
-   // clean pagemarks
-   for(GList* list = Client.Global.pagemarks; list; list = g_list_next(list))
-      free(list->data);
-
-   g_list_free(Client.Global.pagemarks);
-
    // quit application
    gtk_main_quit();
 
@@ -156,11 +150,11 @@ gboolean cb_inputbar_kb_pressed(GtkWidget* widget, GdkEventKey* event, gpointer 
    //--- inputbar shortcuts -----
    switch (keyval) {
       case GDK_Tab:
-         run_completion(NEXT);      return TRUE;
+         run_completion(NEXT);         return TRUE;
       case GDK_Up:
-         run_completion(PREVIOUS);  return TRUE;
+         run_completion(PREVIOUS);     return TRUE;
       case GDK_Down:
-         run_completion(NEXT);      return TRUE;
+         run_completion(NEXT);         return TRUE;
    }
 
    return FALSE;
@@ -278,7 +272,7 @@ gboolean cb_tab_kb_pressed(WebKitWebView *wv, GdkEventKey *event) {
         ) {
          sc->function(&(sc->argument));
          if(Client.Global.buffer!=NULL){
-            //g_string_free(Client.Global.buffer, TRUE);
+            g_string_free(Client.Global.buffer, TRUE);
             Client.Global.buffer = NULL;
             gtk_label_set_text((GtkLabel*) Client.Statusbar.message, "");
          }

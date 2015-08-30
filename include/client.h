@@ -32,8 +32,8 @@ struct {
    struct {
       GString     *buffer;
       gint        mode;
+      GList       *pages;
       GList       *active_downloads;
-      GList       *pagemarks;
       GList       *quickmarks;
       GList       *bookmarks;
       GList       *sessions;
@@ -43,7 +43,6 @@ struct {
       gchar       *search_handle;
       Script      *user_script;
       GdkKeymap   *keymap;
-      SoupSession *soup_session;
    } Global;
 
    struct {

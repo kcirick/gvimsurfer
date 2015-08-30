@@ -11,60 +11,44 @@
 #include <JavaScriptCore/JavaScript.h>
 
 #include "include/gvimsurfer.h"
-#include "include/utilities.h"
 #include "include/client.h"
+#include "include/utilities.h"
 #include "include/callbacks.h"
 #include "include/completion.h"
 
 #include "config/config.h"
 
-#define COLOUR_RED     "\x1b[31m"
-#define COLOUR_GREEN   "\x1b[32m"
-#define COLOUR_YELLOW  "\x1b[33m"
-#define COLOUR_PURPLE  "\x1b[35m"
-#define COLOUR_RESET   "\x1b[0m"
+#define CRED     "\x1b[31m"
+#define CGREEN   "\x1b[32m"
+#define CYELLOW  "\x1b[33m"
+#define CPURPLE  "\x1b[35m"
+#define CRESET   "\x1b[0m"
 
 //--- Function declaration -----
 char* reference_to_string(JSContextRef, JSValueRef);
 
-
+//--- Function implementation -----
 void notify(gint level, gchar* message) {
-   gboolean output_stderr=FALSE; // set to TRUE for debugging
+   gboolean output_stderr=FALSE; 
+   if(level==DEBUG)  output_stderr=TRUE;
 
-   if(Client.UI.window){
+   if(Client.UI.window && !output_stderr){
       if(level==ERROR || level==WARNING)
          gtk_widget_modify_fg(GTK_WIDGET(Client.Statusbar.message), GTK_STATE_NORMAL, &(Client.Style.notification_fg));
       else 
          gtk_widget_modify_fg(GTK_WIDGET(Client.Statusbar.message), GTK_STATE_NORMAL, &(Client.Style.statusbar_fg));
 
       gtk_label_set_text((GtkLabel*) Client.Statusbar.message, message);
-   }
-
-   if(!Client.UI.window || output_stderr){
-      gchar* coloured_type;
-      if(level==ERROR)   
-         coloured_type=g_strdup(COLOUR_RED "ERROR" COLOUR_RESET);
-      else if(level==WARNING)
-         coloured_type=g_strdup(COLOUR_YELLOW "WARNING" COLOUR_RESET);
-      else if(level==DEBUG)
-         coloured_type=g_strdup(COLOUR_PURPLE "DEBUG" COLOUR_RESET);
-      else
-         coloured_type=g_strdup(COLOUR_GREEN "INFO" COLOUR_RESET);
-
-      g_printf("%s [%s]:\t%s\n", NAME, coloured_type, message);
-   }
+   } else 
+      say(level, message, -1);
 }
 
-void die(gint level, gchar* message, gint exit_type) {
+void say(gint level, gchar* message, gint exit_type) {
    gchar* coloured_type;
-   if(level==ERROR)   
-      coloured_type=g_strdup(COLOUR_RED "ERROR" COLOUR_RESET);
-   else if(level==WARNING)
-      coloured_type=g_strdup(COLOUR_YELLOW "WARNING" COLOUR_RESET);
-   else if(level==DEBUG)
-      coloured_type=g_strdup(COLOUR_PURPLE "DEBUG" COLOUR_RESET);
-   else
-      coloured_type=g_strdup(COLOUR_GREEN "INFO" COLOUR_RESET);
+        if(level==ERROR)   coloured_type=g_strdup(CRED "ERROR" CRESET);
+   else if(level==WARNING) coloured_type=g_strdup(CYELLOW "WARNING" CRESET);
+   else if(level==DEBUG)   coloured_type=g_strdup(CPURPLE "DEBUG" CRESET);
+   else                    coloured_type=g_strdup(CGREEN "INFO" CRESET);
 
    g_printf("%s [%s]:\t%s\n", NAME, coloured_type, message);
 
@@ -122,6 +106,11 @@ void open_uri(WebKitWebView* web_view, const gchar* uri) {
    } 
    webkit_web_view_load_uri(web_view, new_uri);
 
+   // replace space with '+' for history
+   for(int i=0; i<strlen(new_uri); i++){
+      if(new_uri[i]==' ') new_uri[i]='+';
+   }
+
    // update history
    if(!private_browsing) {
       /* we verify if the new_uri is already present in the list*/
@@ -141,9 +130,10 @@ void open_uri(WebKitWebView* web_view, const gchar* uri) {
 
 void set_proxy(gboolean onoff) {
    gchar   *filename, *new;
+   Page* page = get_current_page();
 
    if(!onoff) {
-      g_object_set(Client.Global.soup_session, "proxy-uri", NULL, NULL);
+      g_object_set(page->soup_session, "proxy-uri", NULL, NULL);
 
       notify(INFO, "Proxy deactivated");
    } else {
@@ -158,13 +148,24 @@ void set_proxy(gboolean onoff) {
       new = g_strrstr(filename, "://") ? g_strdup(filename) : g_strconcat("http://", filename, NULL);
       SoupURI* proxy_uri = soup_uri_new(new);
 
-      g_object_set(Client.Global.soup_session, "proxy-uri", proxy_uri, NULL);
+      g_object_set(page->soup_session, "proxy-uri", proxy_uri, NULL);
 
       soup_uri_free(proxy_uri);
       g_free(new);
 
       notify(INFO, "Proxy activated");
    }
+}
+
+Page* get_current_page(){
+   GList* pages = Client.Global.pages;
+   Page* page;
+   for(int i=0; i<g_list_length(pages); i++){
+      page = (Page*) g_list_nth_data(pages, i);
+      if(page->wv == GET_CURRENT_TAB()) break;
+   }
+   
+   return page;
 }
 
 void change_mode(int mode) {
@@ -380,7 +381,7 @@ gboolean load_script(gchar* path){
 
    // load new script
    Client.Global.user_script = malloc(sizeof(Script));
-   if(!Client.Global.user_script) die(ERROR, "Out of memory", EXIT_FAILURE);
+   if(!Client.Global.user_script) say(ERROR, "Out of memory", EXIT_FAILURE);
 
    Client.Global.user_script->path    = path;
    Client.Global.user_script->content = content;

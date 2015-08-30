@@ -10,8 +10,8 @@
 #include <webkit/webkit.h>
 
 #include "include/gvimsurfer.h"
-#include "include/utilities.h"
 #include "include/client.h"
+#include "include/utilities.h"
 #include "include/completion.h"
 #include "include/commands.h"
 #include "include/callbacks.h"
@@ -102,15 +102,14 @@ gboolean cmd_pagemark(int argc, char** argv){
    adjustment = gtk_scrolled_window_get_hadjustment(GET_CURRENT_TAB_WIDGET());
    gdouble ha = gtk_adjustment_get_value(adjustment);
    float zl   = webkit_web_view_get_zoom_level(GET_CURRENT_TAB());
-   int ti     = gtk_notebook_get_current_page(Client.UI.webview);
+
+   Page* page = get_current_page();
 
    // search if entry already exists
-   GList* list;
-   for(list = Client.Global.pagemarks; list; list = g_list_next(list)) {
+   for(GList* list = page->pagemarks; list; list = g_list_next(list)) {
       PMark* pmark = (PMark*) list->data;
 
       if(pmark->id == id) {
-         pmark->tab_id      = ti;
          pmark->vadjustment = va;
          pmark->hadjustment = ha;
          pmark->zoom_level  = zl;
@@ -121,13 +120,12 @@ gboolean cmd_pagemark(int argc, char** argv){
    // add new marker
    PMark* pmark = malloc(sizeof(PMark));
    pmark->id          = id;
-   pmark->tab_id      = ti;
    pmark->vadjustment = va;
    pmark->hadjustment = ha;
    pmark->zoom_level  = zl;
 
-   Client.Global.pagemarks = g_list_append(Client.Global.pagemarks, pmark);
-
+   page->pagemarks = g_list_append(page->pagemarks, pmark);
+   
    return TRUE;
 }
 
@@ -138,8 +136,7 @@ gboolean cmd_quickmark(int argc, char** argv){
    char* this_uri = (char*) webkit_web_view_get_uri(GET_CURRENT_TAB());
 
    // search if entry already exists
-   GList* list;
-   for(list = Client.Global.quickmarks; list; list = g_list_next(list)){
+   for(GList* list = Client.Global.quickmarks; list; list = g_list_next(list)){
       QMark* qmark = (QMark*) list->data;   
 
       if(qmark->id == id){

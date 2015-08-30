@@ -224,12 +224,11 @@ void sc_navigate_tabs(Argument* argument) {
 void sc_pagemark(Argument* argument) {
    gint id = get_int_from_buffer(Client.Global.buffer->str);
 
-   GList* list;
-   for(list = Client.Global.pagemarks; list; list = g_list_next(list)) {
+   Page* page = get_current_page();
+   for(GList *list = page->pagemarks; list; list = g_list_next(list)) {
       PMark* pmark = (PMark*) list->data;
 
       if(pmark->id == id) {
-         gtk_notebook_set_current_page(Client.UI.webview, pmark->tab_id);
          GtkAdjustment* adjustment;
          adjustment = gtk_scrolled_window_get_vadjustment(GET_CURRENT_TAB_WIDGET());
          gtk_adjustment_set_value(adjustment, pmark->vadjustment);

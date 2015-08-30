@@ -6,7 +6,7 @@
 #define UTILITIES_H
 
 void        notify(gint, gchar*);
-void        die(gint, gchar*, gint);
+void        say(gint, gchar*, gint);
 
 void        clear_input();
 gchar*      build_proper_path(gchar*);
@@ -21,5 +21,6 @@ void        search_and_highlight(gboolean, gchar*);
 gboolean    sessionload(char*);
 gboolean    sessionsave(char*);
 void        set_proxy(gboolean);
+Page*       get_current_page();
 
 #endif

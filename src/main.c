@@ -8,8 +8,8 @@
 #include <webkit/webkit.h>
 
 #include "include/gvimsurfer.h"
-#include "include/utilities.h"
 #include "include/client.h"
+#include "include/utilities.h"
 
 //--- Local variable -----
 static const gchar default_config_file[] = ".config/gvimsurfer/configrc";
@@ -30,22 +30,19 @@ int main(int argc, char* argv[]) {
       { NULL } };
 
    if (!gtk_init_with_args(&argc, &argv, "[URL1 URL2 ...]", opts, NULL, &err))
-      die(ERROR, err->message, EXIT_FAILURE);
+      say(ERROR, err->message, EXIT_FAILURE);
 
    if (version)
-      die(INFO, "Version "VERSION, EXIT_SUCCESS);
+      say(INFO, "Version "VERSION, EXIT_SUCCESS);
 
    private_browsing = private;
 
    // read config file
-   gchar* configfile=NULL;
-   if (cfile)
-      configfile = g_strdup(cfile);
-   else
-      configfile = g_build_filename(g_get_home_dir(), default_config_file, NULL);
+   gchar* configfile= cfile ?
+      g_strdup(cfile): g_build_filename(g_get_home_dir(), default_config_file, NULL);
 
    if(!read_configuration(configfile)) 
-      die(ERROR, g_strdup_printf("Invalid configuration file: %s", configfile), EXIT_FAILURE);
+      say(ERROR, g_strdup_printf("Invalid configuration file: %s", configfile), EXIT_FAILURE);
 
    // init client 
    init_client();

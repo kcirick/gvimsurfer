@@ -25,6 +25,7 @@ typedef struct {
 Completion*       cc_open(char*);
 Completion*       cc_session(char*);
 Completion*       cc_settings(char*);
+Completion*       cc_history(char*);
 
 void run_completion(gint);
 

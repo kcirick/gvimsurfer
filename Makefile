@@ -15,6 +15,7 @@ CC = gcc
 LFLAGS = -lc ${GTK_LIB} -lm
 CFLAGS = -std=c99 -pedantic -Wall -I./ -I/usr/include $(GTK_INC)
 CFLAGS += -DVERSION=\"$(VERSION)\" -D_XOPEN_SOURCE=600 -DTARGET=\"$(TARGET)\" -DNAME=\"$(NAME)\"
+CFLAGS += -g
 
 all: ${TARGET}
 

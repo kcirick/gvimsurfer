@@ -10,8 +10,8 @@
 #include <webkit/webkit.h>
 
 #include "include/gvimsurfer.h"
-#include "include/utilities.h"
 #include "include/client.h"
+#include "include/utilities.h"
 #include "include/callbacks.h"
 #include "include/completion.h"
 #include "include/commands.h"
@@ -36,7 +36,7 @@ void              cr_set_color(GtkBox*, int, int);
 //--- Completion -----
 Completion* completion_init() {
    Completion *completion = malloc(sizeof(Completion));
-   if(!completion)   die(ERROR, "Out of memory", EXIT_FAILURE);
+   if(!completion)   say(ERROR, "Out of memory", EXIT_FAILURE);
 
    completion->groups = NULL;
 
@@ -103,7 +103,7 @@ void cg_add_element(CompletionGroup* group, char* name) {
 
 CompletionGroup* cg_create(char* name) {
    CompletionGroup* group = malloc(sizeof(CompletionGroup));
-   if(!group)      die(ERROR, "Out of memory", EXIT_FAILURE);
+   if(!group)      say(ERROR, "Out of memory", EXIT_FAILURE);
 
    group->value    = name;
    group->elements = NULL;
@@ -128,7 +128,7 @@ Completion* cc_open(char* input) {
       }
    }
 
-   /* we make bookmark and history completion case insensitive */
+   // make bookmark completion case insensitive
    gchar* lowercase_input = g_utf8_strdown(input, -1);
 
    //--- bookmarks -----
@@ -147,7 +147,16 @@ Completion* cc_open(char* input) {
       }
    }
 
-   //--- history -----
+   g_free(lowercase_input);
+
+   return completion;
+}
+
+Completion* cc_history(char* input){
+   Completion* completion = completion_init();
+
+   gchar* lowercase_input = g_utf8_strdown(input, -1);
+
    if(Client.Global.history) {
       CompletionGroup* history = cg_create("History");
       completion->groups = g_list_append(completion->groups, history);
@@ -284,7 +293,7 @@ void run_completion(gint arg) {
          }
 
          rows = malloc(sizeof(CompletionRow));
-         if(!rows) die(ERROR, "Out of memory", EXIT_FAILURE);
+         if(!rows) say(ERROR, "Out of memory", EXIT_FAILURE);
 
          for(GList* grlist = result->groups; grlist; grlist = g_list_next(grlist)) {
             CompletionGroup* group = (CompletionGroup*)grlist->data;
@@ -316,7 +325,7 @@ void run_completion(gint arg) {
       else {
 
          rows = malloc(LENGTH(commands) * sizeof(CompletionRow));
-         if(!rows)   die(ERROR, "Out of memory", EXIT_FAILURE);
+         if(!rows)   say(ERROR, "Out of memory", EXIT_FAILURE);
 
          for(unsigned int i = 0; i < LENGTH(commands); i++) {
             int cmd_length  = commands[i].command ? strlen(commands[i].command) : 0;
@@ -334,7 +343,7 @@ void run_completion(gint arg) {
       gtk_box_pack_start(Client.UI.box, GTK_WIDGET(results), FALSE, FALSE, 0);
       gtk_widget_show(GTK_WIDGET(results));
 
-      current_item = (arg == NEXT) ? -1 : 0;
+      //current_item = (arg == NEXT) ? -1 : 0;
    }
 
    /* update coloring iff there is a list with items */
@@ -354,7 +363,7 @@ void run_completion(gint arg) {
                next_group = 1;
             continue;
          } else {
-            if(n_entries>1 && (next_group == 0) && (arg == NEXT_GROUP || arg == PREVIOUS_GROUP))
+            if(n_entries>1 && (next_group==0) && (arg == NEXT_GROUP || arg == PREVIOUS_GROUP))
                continue;
             break;
          }

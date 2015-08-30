@@ -16,6 +16,7 @@ static const Command commands[] = {
   {"pmark",    cmd_pagemark,     0 },              // Set pagemark
   {"e",        cmd_open,         cc_open },        // Open URI in current tab
   {"open",     cmd_open,         cc_open },
+  {"history",  cmd_open,         cc_history },     // Open URI from history
   {"print",    cmd_print,        0 },              // Print page
   {"q",        cmd_quit,         0 },              // Quit current tab
   {"quit",     cmd_quit,         0 },
