@@ -1,29 +1,48 @@
 # gVimSurfer
 
-Web browser that looks and works like gVim
+A WebkitGTK-based Web browser that looks and works like gVim
 
 
 ## Description:
 
   - Features/functions inspired by jumanji and vimprobable
-  - organized in a way it makes sense
+  - organized in a way that makes sense
   - Requires following as dependencies:
    - gtk+-2
    - webkit-1.0
    - libsoup 
-  - ~~Not meant to be installed but compiled to a local folder (eg. $HOME/.local/bin)~~
-  - All configuration is stored under $HOME/.config/gvimsurfer (run the setup script to create it)
+  - All configuration is stored under $HOME/.config/gvimsurfer (run the setup script to create it - See installation section below)
 
+## Features:
+
+  - Look and feel:
+   - Customize statusbar colours, completion colours and browser font
+   - Hide tabs, statusbar and scrollbars for maximum real estate
+  - Navigate using keyboard
+   - Hinting via javascript
+   - Tab completion for URI (bookmarks and history), commands and settings
+  - Search engines
+   - Can define multiple search engines through config file to search the web
+  - Bookmarks
+   - Store bookmarks for future reference
+  - Quickmarks
+   - Quickly mark a webpage you want to come back to. Not stored after the browser is closed
+  - Pagemarks
+   - Quickly mark a section/view in a webpage you want to come back to. Not stored after the browser is closed
+  - Flash block (NEW)
+   - Flash frames are replaced with a black rectangle. It can be loaded when the rectangle is clicked 
+  - Sessions
+   - Able to save sessions (collection of tabs with the opened webpages) to be loaded in the future
 
 ## Installation:
 
   1. Clone a copy: `> git clone https://github.com/kcirick/gvimsurfer.git`
   2. Compile the code: `> make`
-  3. Make a link to the excutable (Optional): `> ln -s gvimsurfer ~/.local/bin/gvimsurfer`
-  4. Run the setup script: `> sh setup.sh`
-  5. Make changes to configrc
+  3. Install: `> make install` (as root)
+  4. Run the setup script: `> sh /usr/share/gvimsurfer/setup.sh`
+  5. Make changes to configrc (located in $HOME/.config/gvimsurfer)
   6. Run 'gvimsurfer' (try 'gvimsurfer --help' for help)
-
+  7. To uninstall: `> make uninstall` (as root)
 
 ## A screenshot:
 
@@ -33,6 +52,9 @@ Web browser that looks and works like gVim
 
 ## Version Log:
 
+  - 0.4 (Work-in-progress):
+   - Implement flash block
+   - Bug fixes
   - 0.3 (2015-08-30):
    - Correctly updates when clicking on tabs
    - Split "open" command to "open" and "history":
@@ -51,7 +73,9 @@ Web browser that looks and works like gVim
 
 ## To do / Known issues:
 
-  - WISHLIST: Implement adblock
-  - TODO: Make install/uninstall routine to Makefile
+  - BUG: Several GLib-GObject warnings to address
   - TODO: Code cleanup
+  - DONE: ~~Implement flash block~~ (could still be buggy)
+  - DONE: ~~Implement adblock~~ -> use css stylesheet
+  - DONE: ~~Make install/uninstall routine to Makefile~~
 

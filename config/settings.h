@@ -21,6 +21,7 @@ static const Setting settings[] = {
    { "auto_shrink_images",    NULL,                "auto-shrink-images",      'b' },   // Shrink standalone images to fit
    { "background",            NULL,                "print-backgrounds",       'b' },   // Print background images
    { "full_content_zoom",     &(full_content_zoom), "full-content-zoom",      'b' },   // Scale full content when zooming
+   { "flash_block",           &(fb_enabled),       NULL,                      'b' },   // Enable flash block
    { "images",                NULL,                "auto-load-images",        'b' },   // Load images automatically
    { "java_applet",           NULL,                "enable-java-applet",      'b' },   // Enable Java <applet> tag
    { "page_cache",            NULL,                "enable-page-cache",       'b' },   // Enable page cache

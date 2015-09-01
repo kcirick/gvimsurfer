@@ -210,7 +210,7 @@ void run_script(char* script, char** value, char** error) {
       *value = reference_to_string(context, val);
 }
 
-void download_content(WebKitDownload* download, const gchar* filename){
+gboolean download_content(WebKitDownload* download, const gchar* filename){
 
    WebKitDownloadStatus status;
 
@@ -230,8 +230,7 @@ void download_content(WebKitDownload* download, const gchar* filename){
    g_signal_connect(download, "notify::status",   G_CALLBACK(cb_download_progress), NULL);
    
    status = webkit_download_get_status(download);
-   if(status == WEBKIT_DOWNLOAD_STATUS_CREATED)
-      webkit_download_start(download);
+   return status == WEBKIT_DOWNLOAD_STATUS_CREATED;
 }
 
 gchar* build_proper_path(gchar* path){
@@ -277,6 +276,7 @@ gboolean read_configuration(gchar* configrc) {
       if(!strcmp(id, "show_statusbar"))      show_statusbar = strcmp(value, "false") ? TRUE : FALSE;
       if(!strcmp(id, "show_tabbar"))         show_tabbar = strcmp(value, "false") ? TRUE : FALSE;
       if(!strcmp(id, "strict_ssl"))          strict_ssl = strcmp(value, "false") ? TRUE : FALSE;
+      if(!strcmp(id, "flash_block"))         fb_enabled = strcmp(value, "false") ? TRUE : FALSE;
 
       if(!strcmp(id, "home_page"))        home_page = value;
       if(!strcmp(id, "user_agent"))       user_agent = value;

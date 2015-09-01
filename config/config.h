@@ -10,6 +10,7 @@ gint   default_width;
 gint   default_height;
 gint   max_title_length;
 
+gboolean fb_enabled;
 gboolean full_content_zoom;
 gboolean show_scrollbars;
 gboolean show_statusbar;

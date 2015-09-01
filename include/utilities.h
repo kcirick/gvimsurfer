@@ -11,7 +11,7 @@ void        say(gint, gchar*, gint);
 void        clear_input();
 gchar*      build_proper_path(gchar*);
 void        change_mode(int);
-void        download_content(WebKitDownload*, const gchar*);
+gboolean    download_content(WebKitDownload*, const gchar*);
 gint        get_int_from_buffer(gchar*);
 gboolean    load_script(gchar*);
 void        open_uri(WebKitWebView*, const gchar*);

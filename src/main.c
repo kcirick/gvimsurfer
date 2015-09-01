@@ -37,17 +37,17 @@ int main(int argc, char* argv[]) {
 
    private_browsing = private;
 
-   // read config file
+   //--- read config file -----
    gchar* configfile= cfile ?
       g_strdup(cfile): g_build_filename(g_get_home_dir(), default_config_file, NULL);
 
    if(!read_configuration(configfile)) 
       say(ERROR, g_strdup_printf("Invalid configuration file: %s", configfile), EXIT_FAILURE);
 
-   // init client 
+   //--- init client -----
    init_client();
 
-   // create tab 
+   //--- create tab -----
    if(argc < 2)
       create_tab(NULL, TRUE);
    else

@@ -1,7 +1,8 @@
-VERSION = 0.3
+VERSION = 0.4
 
 TARGET	= gvimsurfer
 NAME		= gVimSurfer
+PREFIX  ?= /usr
 SRC      = $(wildcard src/*.c) 
 HDR		= $(wildcard include/*.h)
 OBJ  		= $(addprefix obj/,$(notdir $(SRC:.c=.o)))
@@ -43,13 +44,18 @@ info:
 	@echo "LIBS    = ${LFLAGS}"
 
 install: all
-	@echo installing...
+	@echo installing to ${DESTDIR}${PREFIX}...
 	@mkdir -p ${DESTDIR}${PREFIX}/bin
 	@cp -f ${TARGET} ${DESTDIR}${PREFIX}/bin
 	@chmod 755 ${DESTDIR}${PREFIX}/bin/${TARGET}
+	@mkdir -p ${DESTDIR}${PREFIX}/share/${TARGET}
+	@cp -f setup.sh configrc script.js ${DESTDIR}${PREFIX}/share/${TARGET}
+	@chmod 755 ${DESTDIR}${PREFIX}/share/${TARGET}/setup.sh
 
 uninstall:
 	@echo uninstalling...
-	@rm -f ${DESKDIR}${PREFIX}/bin/${TARGET}
+	@rm -f ${DESTDIR}${PREFIX}/bin/${TARGET}
+	@rm -f ${DESTDIR}${PREFIX}/share/${TARGET}/*
+	@rm -rf ${DESTDIR}${REFIX}/share/${TARGET}
 
 .PHONY: all clean info

@@ -14,6 +14,7 @@
 #include "include/utilities.h"
 #include "include/callbacks.h"
 #include "include/shortcuts.h"
+#include "include/flashblock.h"
 
 #include "config/config.h"
 
@@ -179,7 +180,8 @@ void init_client_data(){
          g_free(lines);
       }
    }
-   // load cookies
+
+   // load cookies and set up soup session
    SoupCookieJar *cookiejar = soup_cookie_jar_text_new(cookies, FALSE);
    soup_session_add_feature(Client.Global.soup_session, (SoupSessionFeature*) cookiejar);
 

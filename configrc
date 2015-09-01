@@ -11,6 +11,7 @@ completion_color     = #DDDDDD #222222 #99CCFF
 
 #--- Browser settings -----
 full_content_zoom = false
+flash_block       = true
 show_scrollbars   = false
 show_statusbar    = true
 show_tabbar       = true 

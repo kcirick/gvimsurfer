@@ -375,12 +375,12 @@ gboolean cmd_write(int argc, char** argv) {
    int h_counter = 0;
 
    GString *history_list = g_string_new("");
-   for(GList* h = Client.Global.history; h && (!history_limit || h_counter < history_limit); h = g_list_next(h)) {
-      char* uri = g_strconcat((char*) h->data, "\n", NULL);
+   for(GList* h=Client.Global.history; h && (!history_limit || h_counter<history_limit); h=g_list_next(h)) {
+      gchar* uri = g_strconcat((gchar*) h->data, "\n", NULL);
       history_list = g_string_append(history_list, uri);
       g_free(uri);
 
-      h_counter += 1;
+      h_counter++;
    }
 
    g_file_set_contents(history, history_list->str, -1, NULL);

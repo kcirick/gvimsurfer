@@ -18,6 +18,7 @@
 #include "include/utilities.h"
 #include "include/completion.h"
 #include "include/commands.h"
+#include "include/flashblock.h"
 
 #include "config/config.h"
 #include "config/commands.h"
@@ -204,9 +205,7 @@ GtkWidget* cb_wv_create_webview(WebKitWebView* wv, WebKitWebFrame* frame, gpoint
 }
 
 gboolean cb_wv_download_request(WebKitWebView* wv, WebKitDownload* download, gpointer data) {
-
-   download_content(download, webkit_download_get_suggested_filename(download));
-   return TRUE;
+   return download_content(download, webkit_download_get_suggested_filename(download));
 }
 
 gboolean cb_wv_hover_link(WebKitWebView* wv, gchar* title, gchar* link, gpointer data) {
@@ -355,18 +354,26 @@ gboolean cb_wv_load_committed(WebKitWebView* wv, WebKitWebFrame* frame, gpointer
    }
    run_script(buffer, NULL, NULL);
 
+   // Flashblock stuff
+   if(fb_enabled){
+      FBFrames = NULL;
+      WebKitDOMDocument *doc = webkit_web_view_get_dom_document(wv);
+      WebKitDOMDOMWindow *win = webkit_dom_document_get_default_view(doc);
+      webkit_dom_event_target_add_event_listener(WEBKIT_DOM_EVENT_TARGET(win), "beforeload", G_CALLBACK(cb_flashblock_before_load), TRUE, NULL);
+      webkit_dom_event_target_add_event_listener(WEBKIT_DOM_EVENT_TARGET(win), "beforeunload", G_CALLBACK(cb_flashblock_before_unload), TRUE, NULL);
+   }
+
    return TRUE;
 }
 
 gboolean cb_wv_load_finished(WebKitWebView *wv, WebKitWebFrame* frame, gpointer user_data){
 
+   update_client(gtk_notebook_get_current_page(Client.UI.webview));
+
    gchar* uri = (gchar*) webkit_web_view_get_uri(wv);
+   if(!uri) return FALSE;
 
    //--- Update history -----
-   // replace space with '+' for history
-   //for(int i=0; i<strlen(uri); i++)
-   //   if(uri[i]==' ') uri[i]='+';
-
    if(!private_browsing) {
       // we verify if the new_uri is already present in the list
       GList* l = g_list_find_custom(Client.Global.history, uri, (GCompareFunc)strcmp);
@@ -377,8 +384,6 @@ gboolean cb_wv_load_finished(WebKitWebView *wv, WebKitWebFrame* frame, gpointer 
       } else 
          Client.Global.history = g_list_prepend(Client.Global.history, g_strdup(uri));
    }
-
-   update_client(gtk_notebook_get_current_page(Client.UI.webview));
 
    return TRUE;
 }
