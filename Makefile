@@ -1,4 +1,4 @@
-VERSION = 0.4
+VERSION = 0.4b
 
 TARGET	= gvimsurfer
 NAME		= gVimSurfer

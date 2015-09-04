@@ -64,7 +64,7 @@ A WebkitGTK-based Web browser that looks and works like gVim
    - Revert splitting of "open" command (was done in version 0.3)
    - Fix broken HINTS mode (also renamed from FOLLOW mode)
    - Bug fixes
-  - 0.3 (2015-08-30):
+  - 0.3 (2015-08-30) (<a href='https://github.com/kcirick/gvimsurfer/archive/0.3.zip'>download .zip</a>):
    - Correctly updates when clicking on tabs
    - ~~Split "open" command to "open" and "history"~~:
      - ~~"open" will open search engine and bookmarks completion list~~
@@ -72,13 +72,13 @@ A WebkitGTK-based Web browser that looks and works like gVim
    - Each page has its own pagemark (previously all one giant session)
    - Fix several seg faults and weird crashes
    - General code clean-up
-  - 0.2 (2015-08-19):
+  - 0.2 (2015-08-19) (<a href='https://github.com/kcirick/gvimsurfer/archive/0.2.zip'>download .zip</a>):
    - Adding close button to tabs
    - Better support for focus during INSERT mode
    - Fix completion method
    - Simplify some functions
    - Adding default javascript file and setup script
-  - 0.1 (2015-08-06): A working web browser
+  - 0.1 (2015-08-06) (<a href='https://github.com/kcirick/gvimsurfer/archive/0.1.zip'>download .zip</a>): A working web browser
 
 ## To do / Known issues:
 
