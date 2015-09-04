@@ -1,4 +1,4 @@
-VERSION = 0.4b
+VERSION = 0.4
 
 TARGET	= gvimsurfer
 NAME		= gVimSurfer
@@ -38,7 +38,7 @@ clean:
 	@rm -rf obj/
 
 info:
-	@echo ${TARGET} build options:
+	@echo ${TARGET}-${VERSION} build options:
 	@echo "CC      = ${CC}"
 	@echo "CFLAGS  = ${CFLAGS}"
 	@echo "LIBS    = ${LFLAGS}"
