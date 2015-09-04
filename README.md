@@ -24,7 +24,7 @@ A WebkitGTK-based Web browser that looks and works like gVim
   - Search engines
    - Can define multiple search engines through config file to search the web
   - Bookmarks
-   - Store bookmarks for future reference
+   - Store bookmarks (with tags) for future reference
   - Quickmarks
    - Quickly mark a webpage you want to come back to. Not stored after the browser is closed
   - Pagemarks
@@ -44,7 +44,7 @@ A WebkitGTK-based Web browser that looks and works like gVim
   6. Run 'gvimsurfer' (try 'gvimsurfer --help' for help)
   7. To uninstall: `> make uninstall` (as root)
 
-## A screenshot:
+## Screenshots:
 
 <a href='http://s6.postimg.org/yrjhkoqn5/Screenshot_190815_02_21_42_AM.png' target='_blank'><img src='http://s6.postimg.org/yrjhkoqn5/Screenshot_190815_02_21_42_AM.png' width="350" /></a>
 <a href='http://s6.postimg.org/iukpnyy8x/Screenshot_190815_02_22_09_AM.png' target='_blank'><img src='http://s6.postimg.org/iukpnyy8x/Screenshot_190815_02_22_09_AM.png' width="350" /></a><br /><br />
@@ -54,13 +54,22 @@ A WebkitGTK-based Web browser that looks and works like gVim
 
   - 0.4 (Work-in-progress):
    - Implement flash block
+   - Bookmarks support tags
+   - Adding "add new tab" button
+   - Completion row displays helpful information
+   - Completion row for active downloads
+    - Use command ":download"
+      - Command ":cancel" is now ":download cancel"
+      - Command to list active download is ":download list <TAB>"
+   - Revert splitting of "open" command (was done in version 0.3)
+   - Fix broken HINTS mode (also renamed from FOLLOW mode)
    - Bug fixes
   - 0.3 (2015-08-30):
    - Correctly updates when clicking on tabs
-   - Split "open" command to "open" and "history":
-     - "open" will open search engine and bookmarks completion list
-     - "history" will open history completion list
-   - Each page has its own pagemark ~~and soup session~~ (previously all one giant session)
+   - ~~Split "open" command to "open" and "history"~~:
+     - ~~"open" will open search engine and bookmarks completion list~~
+     - ~~"history" will open history completion list~~
+   - Each page has its own pagemark (previously all one giant session)
    - Fix several seg faults and weird crashes
    - General code clean-up
   - 0.2 (2015-08-19):

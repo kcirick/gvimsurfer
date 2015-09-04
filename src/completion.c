@@ -24,13 +24,11 @@
 // Completion 
 Completion*       completion_init();
 void              completion_free(Completion*);
-
 // Completion Group
-CompletionGroup*  cg_create(char*);
-void              cg_add_element(CompletionGroup*, char*);
-
+CompletionGroup*  cg_create(gchar*);
+void              cg_add_element(CompletionGroup*, gchar*, gchar*);
 // Completion Row
-GtkEventBox*      cr_create(GtkBox*, char*, gboolean);
+GtkEventBox*      cr_create(GtkBox*, gchar*, gchar*, gboolean);
 void              cr_set_color(GtkBox*, int, int);
 
 //--- Completion -----
@@ -53,29 +51,38 @@ void completion_free(Completion* completion) {
 }
 
 //--- Completion Row -----
-GtkEventBox* cr_create(GtkBox* results, char* command, gboolean group) {
+GtkEventBox* cr_create(GtkBox* results, gchar* command, gchar* text, gboolean group) {
+   GtkBox      *icol = GTK_BOX(gtk_hbox_new(FALSE, 0));
    GtkBox      *col = GTK_BOX(gtk_vbox_new(FALSE, 0));
    GtkEventBox *row = GTK_EVENT_BOX(gtk_event_box_new());
    GtkWidget   *separator = gtk_hseparator_new();
    gtk_widget_modify_bg(separator, GTK_STATE_NORMAL, &(Client.Style.completion_fg));
 
-   GtkLabel *show_command     = GTK_LABEL(gtk_label_new(NULL));
+   GtkLabel *show_command  = GTK_LABEL(gtk_label_new(NULL));
+   GtkLabel *show_text     = GTK_LABEL(gtk_label_new(NULL));   
 
    gtk_misc_set_alignment(GTK_MISC(show_command),  0.0, 0.0);
+   gtk_misc_set_alignment(GTK_MISC(show_text),     0.0, 0.0);
    gtk_misc_set_padding(GTK_MISC(show_command),    1.0, 1.0);
+   gtk_misc_set_padding(GTK_MISC(show_text),       1.0, 1.0);
 
    gtk_label_set_use_markup(show_command, TRUE);
+   gtk_label_set_use_markup(show_text,    TRUE);
 
    gtk_label_set_markup(show_command, group ? 
       g_markup_printf_escaped("<b>%s</b>",   command ? command : "") :
       g_markup_printf_escaped("%s",          command ? command : "") );
-   
-   gtk_widget_modify_fg(GTK_WIDGET(show_command),     GTK_STATE_NORMAL, &(Client.Style.completion_fg));
-   gtk_widget_modify_bg(GTK_WIDGET(row),              GTK_STATE_NORMAL, &(Client.Style.completion_bg));
-   gtk_widget_modify_font(GTK_WIDGET(show_command),   Client.Style.font);
-   //if(!group) gtk_widget_set_size_request(GTK_WIDGET(row),    -1, Client.Style.statusbar_height);
+   gtk_label_set_markup(show_text, g_markup_printf_escaped("<i>%s</i>", text ? text:""));
 
-   gtk_box_pack_start(GTK_BOX(col), GTK_WIDGET(show_command),     TRUE,  TRUE,  0);
+   gtk_widget_modify_bg(GTK_WIDGET(row),              GTK_STATE_NORMAL, &(Client.Style.completion_bg));
+   gtk_widget_modify_fg(GTK_WIDGET(show_command),     GTK_STATE_NORMAL, &(Client.Style.completion_fg));
+   gtk_widget_modify_fg(GTK_WIDGET(show_text),        GTK_STATE_NORMAL, &(Client.Style.completion_fg));
+   gtk_widget_modify_font(GTK_WIDGET(show_command),   Client.Style.font);
+   gtk_widget_modify_font(GTK_WIDGET(show_text),      Client.Style.font);
+
+   gtk_box_pack_start(GTK_BOX(icol), GTK_WIDGET(show_command),  TRUE,  TRUE,  2);
+   gtk_box_pack_end(GTK_BOX(icol), GTK_WIDGET(show_text),     FALSE, FALSE, 2);
+   gtk_box_pack_start(GTK_BOX(col), GTK_WIDGET(icol), TRUE, TRUE, 0);
    if(group) gtk_box_pack_start(GTK_BOX(col), separator, TRUE, TRUE, 0);
    gtk_container_add(GTK_CONTAINER(row), GTK_WIDGET(col));
    gtk_box_pack_start(results, GTK_WIDGET(row), FALSE, FALSE, 0);
@@ -97,11 +104,7 @@ void cr_set_color(GtkBox* results, int mode, int id) {
 }
 
 //--- Completion Group -----
-void cg_add_element(CompletionGroup* group, char* name) {
-   group->elements = g_list_append(group->elements, name);
-}
-
-CompletionGroup* cg_create(char* name) {
+CompletionGroup* cg_create(gchar* name) {
    CompletionGroup* group = malloc(sizeof(CompletionGroup));
    if(!group)      say(ERROR, "Out of memory", EXIT_FAILURE);
 
@@ -111,8 +114,30 @@ CompletionGroup* cg_create(char* name) {
    return group;
 }
 
+void cg_add_element(CompletionGroup* group, gchar* command, gchar* text) {
+   CompletionElement *element = malloc(sizeof(CompletionElement));
+   element->command  = g_strdup(command);
+   element->text     = g_strdup(text);
+
+   group->elements = g_list_append(group->elements, element);
+}
+
 //--- Completion Command -----
-Completion* cc_open(char* input) {
+Completion* cc_commands(gchar* input) {
+   Completion* completion = completion_init();
+
+   CompletionGroup* group = cg_create("Commands");
+   completion->groups = g_list_append(completion->groups, group);
+
+   for(unsigned int i = 0; i < LENGTH(commands); i++) {
+      if( strlen(input) <= strlen(commands[i].command)  && 
+               !strncmp(input, commands[i].command, strlen(input)) ) 
+         cg_add_element(group, commands[i].command, "");
+   }
+   return completion;
+}
+
+Completion* cc_open(gchar* input) {
    Completion* completion = completion_init();
 
    //--- search engines -----
@@ -124,7 +149,7 @@ Completion* cc_open(char* input) {
          SearchEngine* se =  (SearchEngine*)l->data;
 
          if(strstr(se->name, input))
-            cg_add_element(search_engines, se->name);
+            cg_add_element(search_engines, se->name, se->uri);
       }
    }
 
@@ -137,26 +162,19 @@ Completion* cc_open(char* input) {
       completion->groups = g_list_append(completion->groups, bookmarks);
 
       for(GList* l = Client.Global.bookmarks; l; l = g_list_next(l)) {
-         char* bookmark = (char*) l->data;
-         gchar* lowercase_bookmark = g_utf8_strdown(bookmark, -1);
+         BMark* bmark = (BMark*) l->data;
+         gchar* lowercase_uri = g_utf8_strdown(bmark->uri, -1);
+         gchar* lowercase_tags = bmark->tags? g_utf8_strdown(bmark->tags, -1) : "";
 
-         if(strstr(lowercase_bookmark, lowercase_input))
-            cg_add_element(bookmarks, bookmark);
+         if(strstr(lowercase_uri, lowercase_input) || strstr(lowercase_tags, lowercase_input))
+            cg_add_element(bookmarks, bmark->uri, bmark->tags);
 
-         g_free(lowercase_bookmark);
+         g_free(lowercase_uri); 
+         if(strlen(lowercase_tags)) g_free(lowercase_tags);
       }
    }
 
-   g_free(lowercase_input);
-
-   return completion;
-}
-
-Completion* cc_history(char* input){
-   Completion* completion = completion_init();
-
-   gchar* lowercase_input = g_utf8_strdown(input, -1);
-
+   //--- history -----
    if(Client.Global.history) {
       CompletionGroup* history = cg_create("History");
       completion->groups = g_list_append(completion->groups, history);
@@ -166,35 +184,36 @@ Completion* cc_history(char* input){
          gchar* lowercase_uri = g_utf8_strdown(uri, -1);
 
          if(strstr(lowercase_uri, lowercase_input))
-            cg_add_element(history, uri);
+            cg_add_element(history, uri, "");
 
          g_free(lowercase_uri);
       }
    }
+
    g_free(lowercase_input);
 
    return completion;
 }
 
-Completion* cc_session(char* input) {
+Completion* cc_session(gchar* input) {
    Completion* completion = completion_init();
 
-   CompletionGroup* group = cg_create(NULL);
+   CompletionGroup* group = cg_create("Sessions");
    completion->groups = g_list_append(completion->groups, group);
 
    for(GList* l = Client.Global.sessions; l; l = g_list_next(l)) {
       Session* se = (Session*)l->data;
 
       if(strstr(se->name, input))
-         cg_add_element(group, se->name);
+         cg_add_element(group, se->name, "");
    }
    return completion;
 }
 
-Completion* cc_settings(char* input) {
+Completion* cc_settings(gchar* input) {
    Completion* completion = completion_init();
    
-   CompletionGroup* group = cg_create(NULL);
+   CompletionGroup* group = cg_create("Browser Settings");
    completion->groups = g_list_append(completion->groups, group);
 
    unsigned int input_length = input ? strlen(input) : 0;
@@ -202,34 +221,63 @@ Completion* cc_settings(char* input) {
    for(unsigned int i = 0; i < LENGTH(settings); i++) {
       if( (input_length <= strlen(settings[i].name)) &&
             !strncmp(input, settings[i].name, input_length) ){
-         cg_add_element(group, settings[i].name);
+         gchar* type_name="";
+         switch(settings[i].type){
+            case 'b': type_name=strdup("boolean"); break;
+            case 'i': type_name=strdup("integer"); break;
+            case 'f': type_name=strdup("float"); break;
+            case 's': type_name=strdup("string"); break;
+            case 'c': type_name=strdup("character"); break;
+            default:  type_name=strdup("special"); break;
+         }
+         cg_add_element(group, settings[i].name, type_name);
       }
    }
    return completion;
 }
 
-// TODO Needs major clean up
+Completion* cc_downloads(gchar* input) {
+   Completion* completion = completion_init();
+
+   CompletionGroup* group = cg_create("Active Downloads");
+   completion->groups = g_list_append(completion->groups, group);
+
+   for(int i=0; i<g_list_length(Client.Global.active_downloads); i++){
+
+      WebKitDownload* this_download = (WebKitDownload*)g_list_nth_data(Client.Global.active_downloads, i);
+      if(this_download){
+         const gchar* filename = webkit_download_get_suggested_filename(this_download);
+
+         gchar* istring = g_strdup_printf("%d",i);
+         gchar* text    = g_strdup_printf("%s - %.0f%% completed", filename, 100*webkit_download_get_progress(this_download));
+
+         if(strstr(istring, input))
+            cg_add_element(group, istring, text);
+
+         g_free(istring); g_free(text);
+      }
+   }
+   return completion;
+}
+
 void run_completion(gint arg) {
    gchar *input      = gtk_editable_get_chars(GTK_EDITABLE(Client.UI.inputbar), 0, -1);
    if(strlen(input)==0 || (input[0]!=':' && arg!=HIDE)) {
-      g_free(input);
-      return;
+      g_free(input); return;
    }
 
    gchar *input_m    = input + 1;
-   gint   length     = strlen(input_m);
-   if(length==0){
-      g_free(input);
-      return;
+   if(strlen(input_m)==0){
+      g_free(input); return;
    }
 
    // get current information
    gchar **entries = g_strsplit_set(input_m, " ", -1);
-   gint n_entries = g_strv_length(entries);
+   gint  n_entries = g_strv_length(entries);
+   gboolean is_command = n_entries==1;
 
-   gchar* current_command        = entries[0];
-   gint   current_command_length = strlen(current_command);
-   gchar* current_parameter      =  n_entries==1 ? NULL : entries[n_entries-1];
+   gchar* new_command   = entries[0];
+   gchar* new_parameter = is_command ? NULL : g_strdup(entries[n_entries-1]);
 
    // static elements
    static GtkBox        *results = NULL;
@@ -238,20 +286,22 @@ void run_completion(gint arg) {
    static gint current_item = 0;
    static gint n_items      = 0;
 
-   static gchar *previous_command   = NULL;
-   static gchar *previous_parameter = NULL;
-   static gint   previous_id        = 0;
-   static gint   previous_length    = 0;
+   static gchar *this_command   = NULL;
+   static gchar *this_parameter = NULL;
+
+   static gboolean first_instance   = TRUE;
 
    /* delete old list if
     *   the completion should be hidden
     *   the current command differs from the previous one
     *   the current parameter differs from the previous one
     */
+   //notify(DEBUG, g_strdup_printf("%s %s / %s %s", this_command, new_command,
+   //         this_parameter, new_parameter));
    if( (arg == HIDE) ||
-         (current_parameter && previous_parameter && strcmp(current_parameter, previous_parameter)) ||
-         (current_command && previous_command && strcmp(current_command, previous_command)) ||
-         (previous_length != length)
+         (new_parameter && this_parameter && strcmp(new_parameter, this_parameter)) ||
+         (new_command && this_command && strcmp(new_command, this_command)) ||
+         (!is_command && strlen(new_parameter)==0)
      ) {
       if(results)    gtk_widget_destroy(GTK_WIDGET(results));
       results        = NULL;
@@ -261,9 +311,10 @@ void run_completion(gint arg) {
       current_item   = 0;
       n_items        = 0;
 
+      first_instance = TRUE;
+
       if(arg == HIDE) {
-         g_free(input);
-         return;
+         g_free(input); return;
       }
    }
 
@@ -271,142 +322,119 @@ void run_completion(gint arg) {
    if( !results ) {
       results = GTK_BOX(gtk_vbox_new(FALSE, 0));
 
-      // create list based on parameters 
-      if(n_entries>1) {
+      Completion *result = NULL;
+      if(is_command){      // create list based on commands
+         result = cc_commands(new_command);
+      } else {             // create list based on parameters 
+         gint command_id=-1;
          for(unsigned int i = 0; i < LENGTH(commands); i++) {
-            if( g_strcmp0(current_command, commands[i].command)!=0 ) continue;
+            if( g_strcmp0(new_command, commands[i].command)!=0 ) continue;
 
             if(commands[i].completion) {
-               previous_command = current_command;
-               previous_id = i;
+               this_command = commands[i].command;
+               command_id = i;
                break;
             } 
-
-            g_free(input);
-            return;
          }
-
-         Completion *result = commands[previous_id].completion(current_parameter ? current_parameter : "");
-         if(!result || !result->groups) {
-            g_free(input);
-            return;
+         if(command_id<0){
+            g_free(input); return;
          }
-
-         rows = malloc(sizeof(CompletionRow));
-         if(!rows) say(ERROR, "Out of memory", EXIT_FAILURE);
-
-         for(GList* grlist = result->groups; grlist; grlist = g_list_next(grlist)) {
-            CompletionGroup* group = (CompletionGroup*)grlist->data;
-            int group_elements = 0;
-
-            for(GList* element = group->elements; element; element = g_list_next(element)) {
-               if(element->data) {
-                  if (group->value && !group_elements) {
-                     rows = realloc(rows, (n_items + 1) * sizeof(CompletionRow));
-                     rows[n_items].command     = group->value;
-                     rows[n_items].command_id  = -1;
-                     rows[n_items].is_group    = TRUE;
-                     rows[n_items++].row       = GTK_WIDGET(cr_create(results, group->value, TRUE));
-                  }
-
-                  rows = realloc(rows, (n_items + 1) * sizeof(CompletionRow));
-                  rows[n_items].command     = element->data;
-                  rows[n_items].command_id  = previous_id;
-                  rows[n_items].is_group    = FALSE;
-                  rows[n_items++].row       = GTK_WIDGET(cr_create(results, element->data, FALSE));
-                  group_elements++;
-               }
-            }
-         }
-         // clean up
-         completion_free(result);
+         result = commands[command_id].completion(new_parameter);
       }
-      // create list based on commands
-      else {
 
-         rows = malloc(LENGTH(commands) * sizeof(CompletionRow));
-         if(!rows)   say(ERROR, "Out of memory", EXIT_FAILURE);
+      rows = malloc(sizeof(CompletionRow));
+      if(!rows) say(ERROR, "Out of memory", EXIT_FAILURE);
 
-         for(unsigned int i = 0; i < LENGTH(commands); i++) {
-            int cmd_length  = commands[i].command ? strlen(commands[i].command) : 0;
+      for(GList* grlist = result->groups; grlist; grlist = g_list_next(grlist)) {
+         CompletionGroup* group = (CompletionGroup*)grlist->data;
+         gboolean header_empty = TRUE;
 
-            if( current_command_length <= cmd_length  && !strncmp(current_command, commands[i].command, current_command_length) ) {
-               rows[n_items].command     = commands[i].command;
-               rows[n_items].command_id  = i;
-               rows[n_items].is_group    = FALSE;
-               rows[n_items++].row       = GTK_WIDGET(cr_create(results, commands[i].command, FALSE));
+         for(GList* element = group->elements; element; element = g_list_next(element)) {
+            CompletionElement* ce = (CompletionElement*)element->data;
+            if (group->value && header_empty) {
+               rows = realloc(rows, (n_items + 1) * sizeof(CompletionRow));
+               rows[n_items].command     = group->value;
+               rows[n_items].is_group    = TRUE;
+               rows[n_items++].row       = GTK_WIDGET(cr_create(results, group->value, NULL, TRUE));
+               header_empty = FALSE;
             }
+
+            rows = realloc(rows, (n_items + 1) * sizeof(CompletionRow));
+            rows[n_items].command     = ce->command;
+            rows[n_items].is_group    = FALSE;
+            rows[n_items++].row       = GTK_WIDGET(cr_create(results, ce->command, ce->text, FALSE));
          }
-         rows = realloc(rows, n_items * sizeof(CompletionRow));
       }
+      // clean up
+      completion_free(result);
 
       gtk_box_pack_start(Client.UI.box, GTK_WIDGET(results), FALSE, FALSE, 0);
       gtk_widget_show(GTK_WIDGET(results));
-
-      //current_item = (arg == NEXT) ? -1 : 0;
    }
 
-   /* update coloring iff there is a list with items */
-   if( (results) && (n_items > 0) ) {
-      int i = 0, next_group = 0;
+   // update row colour if there is a list
+   if( results && n_items > 1 ) {
+      gboolean next_group = FALSE;
 
-      if(!rows[current_item].is_group) cr_set_color(results, NORMAL, current_item);
+      cr_set_color(results, NORMAL, current_item);
 
-      for(i = 0; i < n_items; i++) {
-         if(arg == NEXT || arg == NEXT_GROUP)
+      for(int i = 0; i < n_items; i++) {
+         if(arg==NEXT || arg==NEXT_GROUP)
             current_item = (current_item + n_items + 1) % n_items;
-         else if(arg == PREVIOUS || arg == PREVIOUS_GROUP)
+         else if(arg==PREVIOUS || arg==PREVIOUS_GROUP)
             current_item = (current_item + n_items - 1) % n_items;
 
-         if(rows[current_item].is_group) {
-            if(n_entries>1 && (arg == NEXT_GROUP || arg == PREVIOUS_GROUP))
-               next_group = 1;
-            continue;
+         if(is_command){
+            if(rows[current_item].is_group)  continue;
+            else                             break;
          } else {
-            if(n_entries>1 && (next_group==0) && (arg == NEXT_GROUP || arg == PREVIOUS_GROUP))
+            if(rows[current_item].is_group) {
+               if((arg==NEXT_GROUP || arg==PREVIOUS_GROUP)) next_group = TRUE;
                continue;
-            break;
+            } else {
+               if(first_instance) break;
+               if((arg==NEXT_GROUP || arg==PREVIOUS_GROUP) && !next_group) continue;
+               break;
+            }
          }
       }
       cr_set_color(results, HIGHLIGHT, current_item);
 
-      /* hide other items */
-      int uh = ceil(n_completion_items / 2);
-      int lh = floor(n_completion_items / 2);
+      // hide other items
+      gint uh = ceil(n_completion_items / 2);
+      gint lh = floor(n_completion_items / 2);
 
-      for(i = 0; i < n_items; i++) {
-         if((n_items > 1) && (
-                  (i >= (current_item - lh) && (i <= current_item + uh)) ||
-                  (i < n_completion_items && current_item < lh) ||
-                  (i >= (n_items - n_completion_items) && (current_item >= (n_items - uh))))
+      for(gint i = 0; i < n_items; i++) {
+         if( (i >= (current_item - lh) && (i <= current_item + uh)) ||
+               (i < n_completion_items && current_item < lh) ||
+               (i >= (n_items - n_completion_items) && (current_item >= (n_items - uh)))
            )
             gtk_widget_show(rows[i].row);
          else
             gtk_widget_hide(rows[i].row);
       }
 
-      gchar* temp;
-      if(n_entries==1)
-         temp = g_strconcat(":", rows[current_item].command, (n_items == 1) ? " "  : NULL, NULL);
-      else{
+      // Set input bar text and previous_* variables
+      gchar* new_input_text;
+      if(is_command){
+         gboolean match = g_strcmp0(this_command, rows[current_item].command)==0;
+         new_input_text = g_strconcat(":", rows[current_item].command, match ? " " : NULL, NULL);
+
+         this_command   = rows[current_item].command;
+      } else {
          gchar* other_parameters = "";
-         for(i=1; i<n_entries-1; i++)
+         for(gint i=1; i<n_entries-1; i++)
             other_parameters = g_strconcat(" ", entries[i], NULL);
+         new_input_text = g_strconcat(":", this_command, other_parameters, " ", rows[current_item].command, NULL);
+         if(strlen(other_parameters)>0) g_free(other_parameters);
 
-         temp = g_strconcat(":", previous_command, other_parameters, " ", rows[current_item].command, NULL);
+         this_parameter = g_strdup(rows[current_item].command);
       }
-
-      gtk_entry_set_text(Client.UI.inputbar, temp);
+      gtk_entry_set_text(Client.UI.inputbar, new_input_text);
       gtk_editable_set_position(GTK_EDITABLE(Client.UI.inputbar), -1);
-      g_free(temp);
-
-      previous_command   = (n_entries==1) ? rows[current_item].command : current_command;
-      previous_parameter = (n_entries==1) ? current_parameter : rows[current_item].command;
-      previous_length    = strlen(previous_command);
-      if(n_entries==1)  previous_length += length - current_command_length;
-      else              previous_length += strlen(previous_parameter) + 1;
-
-      previous_id = rows[current_item].command_id;
+      g_free(new_input_text); 
+      
+      first_instance = FALSE;
    }
    g_free(input);
 }

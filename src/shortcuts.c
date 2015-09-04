@@ -97,25 +97,24 @@ void sc_focus_inputbar(Argument* argument) {
 
 void sc_follow_link(Argument* argument) {
    static gboolean follow_links = FALSE;
-   static int      open_mode    = -1;
+   static gboolean open_new_tab = FALSE;
    GdkEventKey *key = (GdkEventKey*)argument->data;
 
-   // update open mode
-   if(argument->i < 0)
-      open_mode = argument->i;
+   if(!argument->data && argument->b)
+      open_new_tab = argument->b;
 
    /* show all links */
-   if(!follow_links || Client.Global.mode != FOLLOW) {
+   if(!follow_links || Client.Global.mode != HINTS) {
       run_script("show_hints()", NULL, NULL);
-      change_mode(FOLLOW);
+      change_mode(HINTS);
       follow_links = TRUE;
       return;
    }
 
-   char* value = NULL;
-   char* cmd   = NULL;
+   gchar* value = NULL;
+   gchar* cmd   = NULL;
 
-   if (argument && argument->i == 10)
+   if (key && key->keyval == GDK_Return)
       cmd = g_strdup("get_active()");
    else if (key && key->keyval == GDK_Tab) {
       if ( key->state & GDK_CONTROL_MASK)
@@ -131,10 +130,10 @@ void sc_follow_link(Argument* argument) {
    g_free(cmd);
 
    if(value && strcmp(value, "undefined")) {
-      if(open_mode == -1)  open_uri(GET_CURRENT_TAB(), value);
-      else                 create_tab(value, TRUE);
+      if(open_new_tab)  create_tab(value, TRUE);
+      else              open_uri(GET_CURRENT_TAB(), value);
 
-      sc_abort(NULL);
+      change_mode(NORMAL);
    }
 }
 

@@ -14,7 +14,6 @@
 #include "include/utilities.h"
 #include "include/completion.h"
 #include "include/commands.h"
-#include "include/callbacks.h"
 
 #include "config/config.h"
 #include "config/settings.h"
@@ -27,47 +26,43 @@ gboolean cmd_back(int argc, char** argv) {
 }
 
 gboolean cmd_bookmark(int argc, char** argv) {
-   char* bookmark = g_strdup(webkit_web_view_get_uri(GET_CURRENT_TAB()));
+   gchar* this_uri = g_strdup(webkit_web_view_get_uri(GET_CURRENT_TAB()));
 
-   /* at first we verify that bookmark (without tag) isn't already in the list */
-   unsigned int bookmark_length = strlen(bookmark);
+   // Verify that the bookmark isn't already in the list
    for(GList* l = Client.Global.bookmarks; l; l = g_list_next(l)) {
-      if(!strncmp(bookmark, (char*) l->data, bookmark_length)) {
-         g_free(l->data);
-         Client.Global.bookmarks = g_list_delete_link(Client.Global.bookmarks, l);
-         break;
-      }
+      BMark *this_bmark = (BMark*) l->data;
+      if(!g_strcmp0(this_uri, this_bmark->uri)) return TRUE;
    }
 
-   if(argc >= 1 && argv[argc] == NULL) {
-      char* tags = g_strjoinv(" ", argv);
-      char* bookmark_temp = bookmark;
-      bookmark = g_strjoin(" ", bookmark, tags, NULL);
-
-      g_free(bookmark_temp);
-      g_free(tags);
-   }
-   Client.Global.bookmarks = g_list_append(Client.Global.bookmarks, bookmark);
+   BMark* new_bmark = malloc(sizeof(BMark));
+   gchar* tags = "";
+   if(argc >= 1 && argv[argc] == NULL)
+      tags = g_strjoinv(" ", argv);
+   new_bmark -> uri = this_uri;
+   new_bmark -> tags = tags;
+   
+   Client.Global.bookmarks = g_list_append(Client.Global.bookmarks, new_bmark);
 
    return TRUE;
 }
 
-gboolean cmd_cancel_download(int argc, char** argv){
+gboolean cmd_handle_downloads(int argc, char** argv){
 
    if(argc<1) return FALSE;
 
-   gint which = atoi(argv[0]);
+   gint which = atoi(argv[argc-1]);
 
    WebKitDownload* this_download = (WebKitDownload*)g_list_nth_data(Client.Global.active_downloads, which);
-
    if(!this_download){
       notify(WARNING, "No such download!");
       return FALSE;
    }
 
-   webkit_download_cancel(this_download);
+   if(!g_strcmp0(argv[0], "cancel")){
+      webkit_download_cancel(this_download);
 
-   notify(INFO, "Download cancelled");
+      notify(INFO, "Download cancelled");
+   }
 
    return TRUE;
 }
@@ -161,7 +156,39 @@ gboolean cmd_quit(int argc, char** argv) {
 }
 
 gboolean cmd_quitall(int argc, char** argv) {
-   cb_destroy(NULL, NULL);
+
+   pango_font_description_free(Client.Style.font);
+
+   // write bookmarks and history
+   if(!private_browsing)   cmd_write(0, NULL);
+
+   // clear bookmarks
+   for(GList* list = Client.Global.bookmarks; list; list = g_list_next(list))
+      free(list->data);
+
+   g_list_free(Client.Global.bookmarks);
+
+   // clear history
+   for(GList* list = Client.Global.history; list; list = g_list_next(list))
+      free(list->data);
+
+   g_list_free(Client.Global.history);
+
+   // clean search engines 
+   for(GList* list = Client.Global.search_engines; list; list = g_list_next(list))
+      free(list->data);
+
+   g_list_free(Client.Global.search_engines);
+
+   // clean quickmarks
+   for(GList* list = Client.Global.quickmarks; list; list = g_list_next(list))
+      free(list->data);
+
+   g_list_free(Client.Global.quickmarks);
+
+   // quit application
+   gtk_main_quit();
+
    return TRUE;
 }
 
@@ -362,7 +389,8 @@ gboolean cmd_write(int argc, char** argv) {
    // save bookmarks
    GString *bookmark_list = g_string_new("");
    for(GList* l = Client.Global.bookmarks; l; l = g_list_next(l)){
-      char* bookmark = g_strconcat((char*) l->data, "\n", NULL);
+      BMark* bmark = (BMark*)l->data;
+      gchar* bookmark = g_strconcat(bmark->uri, " ", bmark->tags ? bmark->tags : "", "\n", NULL);
       bookmark_list = g_string_append(bookmark_list, bookmark);
       g_free(bookmark);
    }

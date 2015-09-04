@@ -14,7 +14,7 @@ typedef struct {
 
 gboolean cmd_back(int, char**);
 gboolean cmd_bookmark(int, char**);
-gboolean cmd_cancel_download(int, char**);
+gboolean cmd_handle_downloads(int, char**);
 gboolean cmd_forward(int, char**);
 gboolean cmd_open(int, char**);
 gboolean cmd_settings(int, char**);

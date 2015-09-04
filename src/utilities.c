@@ -71,38 +71,28 @@ void open_uri(WebKitWebView* web_view, const gchar* uri) {
          new_uri = g_strconcat("file://", uri, NULL);
       // uri does contain any ".", ":" or "/" nor does it start with "localhost"
       else if(!strpbrk(uri, ".:/") && strncmp(uri, "localhost", 9)){
-         //new_uri = g_strconcat("http://", uri, NULL);
          SearchEngine* se = (SearchEngine*)Client.Global.search_engines->data;
          new_uri = g_strdup_printf(se->uri, uri);
       } else
          new_uri = strstr(uri, "://") ? g_strdup(uri) : g_strconcat("http://", uri, NULL);
    
-   } else {       // multiple arguments given
+   } else {       // multiple arguments given -> search engine
 
-      /* first agrument contain "://" -> it's a bookmark with tag */
-      if(g_strrstr(args[0], "://")) {
-         new_uri = g_strdup(args[0]);
-      }
-      /* first agrument doesn't contain "://" -> use search engine */
-      else {
-         SearchEngine* se;
-         gboolean matched=FALSE;
-         for(GList* list = Client.Global.search_engines; list; list = g_list_next(list)){
-            se = (SearchEngine*)list->data;
-            if(g_strcmp0(args[0], se->name)==0){ matched=TRUE; break; }
-         }
-
-         if(!matched){
-            notify(WARNING, g_strdup_printf("Search engine %s doesn't exist", args[0]));
-            se = (SearchEngine*)Client.Global.search_engines->data;
-            uri = g_strjoinv(" ", args);
-            //return;
-         } else 
-            uri = g_strjoinv(" ", &args[1]);
-
-         new_uri = g_strdup_printf(se->uri, uri);
+      SearchEngine* se;
+      gboolean matched=FALSE;
+      for(GList* list = Client.Global.search_engines; list; list = g_list_next(list)){
+         se = (SearchEngine*)list->data;
+         if(g_strcmp0(args[0], se->name)==0){ matched=TRUE; break; }
       }
 
+      if(!matched){
+         notify(WARNING, g_strdup_printf("Search engine %s doesn't exist", args[0]));
+         se = (SearchEngine*)Client.Global.search_engines->data;
+         uri = g_strjoinv(" ", args);
+      } else 
+         uri = g_strjoinv(" ", &args[1]);
+
+      new_uri = g_strdup_printf(se->uri, uri);
    } 
    webkit_web_view_load_uri(web_view, new_uri);
 
@@ -140,13 +130,15 @@ void set_proxy(gboolean onoff) {
 
 Page* get_current_page(){
    GList* pages = Client.Global.pages;
-   Page* page;
+   Page* page = NULL;
+   gboolean matched = FALSE;
    for(int i=0; i<g_list_length(pages); i++){
       page = (Page*) g_list_nth_data(pages, i);
-      if(page->wv == GET_CURRENT_TAB()) break;
+      if(page->wv == GET_CURRENT_TAB()){ matched = TRUE; break; }
    }
-   
-   return page;
+
+   if(!matched)   return NULL;
+   else           return page;
 }
 
 void change_mode(int mode) {
@@ -156,17 +148,11 @@ void change_mode(int mode) {
       case INSERT:
          mode_text = "-- INSERT --";
          break;
-      case VISUAL:
-         mode_text = "-- VISUAL --";
-         break;
-      case FOLLOW:
-         mode_text = "-- FOLLOW -- ";
+      case HINTS:
+         mode_text = "-- HINTS -- ";
          break;
       case PASS_THROUGH:
          mode_text = "-- PASS THROUGH --";
-         break;
-      case PASS_THROUGH_NEXT:
-         mode_text = "-- PASS THROUGH (next)--";
          break;
       default:
          mode_text = "";
@@ -225,7 +211,7 @@ gboolean download_content(WebKitDownload* download, const gchar* filename){
    else
       notify(INFO, g_strdup_printf("Download %s started (unknown size)...", filename));
 
-   Client.Global.active_downloads = g_list_prepend(Client.Global.active_downloads, download);
+   Client.Global.active_downloads = g_list_append(Client.Global.active_downloads, download);
    g_signal_connect(download, "notify::progress", G_CALLBACK(cb_download_progress), NULL);
    g_signal_connect(download, "notify::status",   G_CALLBACK(cb_download_progress), NULL);
    
@@ -425,6 +411,10 @@ gboolean sessionsave(char* session_name) {
    GString* session_uris = g_string_new("");
 
    for (int i = 0; i < gtk_notebook_get_n_pages(Client.UI.webview); i++) {
+
+      GtkWidget* addpage = g_object_get_data(G_OBJECT(Client.UI.webview), "addtab");
+      if(addpage == GTK_WIDGET(GET_NTH_TAB_WIDGET(i))) continue;
+
       gchar* tab_uri   = g_strconcat(webkit_web_view_get_uri(GET_NTH_TAB(i)), " ", NULL);
       session_uris     = g_string_append(session_uris, tab_uri);
 

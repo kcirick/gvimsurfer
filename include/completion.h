@@ -6,6 +6,11 @@
 #define COMPLETION_H
 
 typedef struct {
+   gchar *command;
+   gchar *text;
+} CompletionElement;
+
+typedef struct {
    gchar    *value;
    GList    *elements;
 } CompletionGroup;
@@ -16,16 +21,16 @@ typedef struct {
 
 typedef struct {
    gchar*      command;
-   gint        command_id;
    gboolean    is_group;
    GtkWidget*  row;
 } CompletionRow;
 
 // Completion Command
-Completion*       cc_open(char*);
-Completion*       cc_session(char*);
-Completion*       cc_settings(char*);
-Completion*       cc_history(char*);
+Completion*       cc_commands(gchar*);
+Completion*       cc_open(gchar*);
+Completion*       cc_session(gchar*);
+Completion*       cc_settings(gchar*);
+Completion*       cc_downloads(gchar*);
 
 void run_completion(gint);
 

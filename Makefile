@@ -14,8 +14,8 @@ GTK_LIB = $(shell pkg-config --libs gtk+-2.0 webkit-1.0 )
 
 CC = gcc
 LFLAGS = -lc ${GTK_LIB} -lm
-CFLAGS = -std=c99 -pedantic -Wall -I./ -I/usr/include $(GTK_INC)
-CFLAGS += -DVERSION=\"$(VERSION)\" -D_XOPEN_SOURCE=600 -DTARGET=\"$(TARGET)\" -DNAME=\"$(NAME)\"
+CFLAGS = -std=c99 -pedantic -Wall -I./ -I/usr/include ${GTK_INC}
+CFLAGS += -DVERSION=\"${VERSION}\" -D_XOPEN_SOURCE=600 -DTARGET=\"${TARGET}\" -DNAME=\"${NAME}\"
 
 all: ${TARGET}
 
@@ -24,7 +24,7 @@ obj/%.o : src/%.c
 	@echo " CC " $<
 	@${CC} -c ${CFLAGS} -o $@ $<
 
-$(OBJ) : $(HDR) $(CONFIG)
+${OBJ} : ${HDR} ${CONFIG}
 
 ${TARGET} : ${OBJ}
 	@echo " LD " -o $@

@@ -35,8 +35,6 @@ int main(int argc, char* argv[]) {
    if (version)
       say(INFO, "Version "VERSION, EXIT_SUCCESS);
 
-   private_browsing = private;
-
    //--- read config file -----
    gchar* configfile= cfile ?
       g_strdup(cfile): g_build_filename(g_get_home_dir(), default_config_file, NULL);
@@ -47,6 +45,9 @@ int main(int argc, char* argv[]) {
    //--- init client -----
    init_client();
 
+   // put private browsing flag after initialization
+   private_browsing = private;
+
    //--- create tab -----
    if(argc < 2)
       create_tab(NULL, TRUE);
@@ -56,7 +57,6 @@ int main(int argc, char* argv[]) {
 
    gtk_widget_show_all(GTK_WIDGET(Client.UI.window));
    gtk_widget_hide(GTK_WIDGET(Client.UI.inputbar));
-
    gtk_main();
 
    return EXIT_SUCCESS;

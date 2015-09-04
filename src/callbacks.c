@@ -24,7 +24,40 @@
 #include "config/commands.h"
 #include "config/binds.h"
 
+static gint page_id;
+
 gboolean cb_blank() { return TRUE; }
+
+gboolean cb_destroy(GtkWidget* widget, gpointer data) {
+   cmd_quitall(0, NULL);
+   return TRUE;
+}
+
+gboolean cb_download_progress(WebKitDownload* d, GParamSpec* pspec){
+   WebKitDownloadStatus status = webkit_download_get_status(d);
+   const gchar* filename = webkit_download_get_suggested_filename(d);
+
+   if (status != WEBKIT_DOWNLOAD_STATUS_STARTED && status != WEBKIT_DOWNLOAD_STATUS_CREATED) {
+      if (status == WEBKIT_DOWNLOAD_STATUS_FINISHED)
+         notify(INFO, g_strdup_printf("Download %s finished", filename));
+      if (status == WEBKIT_DOWNLOAD_STATUS_ERROR)
+         notify(ERROR, g_strdup_printf("Error while downloading %s", filename));
+      if (status == WEBKIT_DOWNLOAD_STATUS_CANCELLED)
+         notify(ERROR, g_strdup_printf("Cancelled downloading %s", filename));
+
+      Client.Global.active_downloads = g_list_remove(Client.Global.active_downloads, d);
+   }
+
+   update_statusbar_info(gtk_notebook_get_current_page(Client.UI.webview));
+   return TRUE;
+}
+
+gboolean cb_button_add_tab(GtkButton *button, GtkNotebook *notebook) {
+  gint page_id = GPOINTER_TO_INT( g_object_get_data( G_OBJECT( button ), "page" ) );
+  create_tab(NULL, page_id);
+  
+  return TRUE;
+}
 
 gboolean cb_button_close_tab(GtkButton *button, GtkNotebook *notebook) {
   gint page_id = GPOINTER_TO_INT( g_object_get_data( G_OBJECT( button ), "page" ) );
@@ -34,57 +67,20 @@ gboolean cb_button_close_tab(GtkButton *button, GtkNotebook *notebook) {
 }
 
 gboolean cb_notebook_switch_page(GtkNotebook *notebook, gpointer page, guint page_num, gpointer user_data) {
-   update_client(page_num); 
+   page_id = gtk_notebook_get_current_page(notebook);
    return TRUE;
 }
 
-gboolean cb_destroy(GtkWidget* widget, gpointer data) {
-   pango_font_description_free(Client.Style.font);
 
-   // write bookmarks and history
-   if(!private_browsing)   cmd_write(0, NULL);
+gboolean cb_notebook_switch_page_after(GtkNotebook *notebook, gpointer page, guint page_num, gpointer user_data) {
+   GtkWidget* addpage = g_object_get_data(G_OBJECT(notebook), "addtab");
+   if(GTK_WIDGET(page) == addpage){
+      gtk_notebook_set_current_page(notebook, page_id);
+      return FALSE;
+   } 
+   
+   update_client(page_num);
 
-   // clear bookmarks
-   for(GList* list = Client.Global.bookmarks; list; list = g_list_next(list))
-      free(list->data);
-
-   g_list_free(Client.Global.bookmarks);
-
-   // clear history
-   for(GList* list = Client.Global.history; list; list = g_list_next(list))
-      free(list->data);
-
-   g_list_free(Client.Global.history);
-
-   // clean search engines 
-   for(GList* list = Client.Global.search_engines; list; list = g_list_next(list))
-      free(list->data);
-
-   g_list_free(Client.Global.search_engines);
-
-   // clean quickmarks
-   for(GList* list = Client.Global.quickmarks; list; list = g_list_next(list))
-      free(list->data);
-
-   g_list_free(Client.Global.quickmarks);
-
-   // quit application
-   gtk_main_quit();
-
-   return TRUE;
-}
-
-gboolean cb_download_progress(WebKitDownload* d, GParamSpec* pspec){
-   WebKitDownloadStatus status = webkit_download_get_status(d);
-
-   if (status != WEBKIT_DOWNLOAD_STATUS_STARTED && status != WEBKIT_DOWNLOAD_STATUS_CREATED) {
-      if (status != WEBKIT_DOWNLOAD_STATUS_FINISHED)
-         notify(ERROR, g_strdup_printf("Error while downloading %s", webkit_download_get_suggested_filename(d)));
-      else
-         notify(INFO, g_strdup_printf("Download %s finished", webkit_download_get_suggested_filename(d)));
-      Client.Global.active_downloads = g_list_remove(Client.Global.active_downloads, d);
-   }
-   update_statusbar_info(gtk_notebook_get_current_page(Client.UI.webview));
    return TRUE;
 }
 
@@ -151,7 +147,7 @@ gboolean cb_inputbar_kb_pressed(GtkWidget* widget, GdkEventKey* event, gpointer 
    //--- inputbar shortcuts -----
    switch (keyval) {
       case GDK_Tab:
-         run_completion(NEXT);         return TRUE;
+         run_completion(NEXT_GROUP);   return TRUE;
       case GDK_Up:
          run_completion(PREVIOUS);     return TRUE;
       case GDK_Down:
@@ -279,13 +275,8 @@ gboolean cb_tab_kb_pressed(WebKitWebView *wv, GdkEventKey *event) {
       }
    }
 
-   switch(Client.Global.mode) {
-      case PASS_THROUGH :
-         return FALSE;
-      case PASS_THROUGH_NEXT :
-         change_mode(NORMAL);
-         return FALSE;
-   }
+   // stop here in case of PASS_THROUGH mode
+   if(Client.Global.mode == PASS_THROUGH) return FALSE;
 
    // append only numbers and characters to buffer
    if(Client.Global.mode==NORMAL && isascii(keyval)) {
@@ -297,8 +288,8 @@ gboolean cb_tab_kb_pressed(WebKitWebView *wv, GdkEventKey *event) {
    }
 
    // follow hints
-   if(Client.Global.mode == FOLLOW) {
-      Argument argument = {0};
+   if(Client.Global.mode == HINTS) {
+      Argument argument = {.data=event};
       sc_follow_link(&argument);
       return TRUE;
    }
@@ -345,47 +336,48 @@ gboolean cb_wv_notify_title(WebKitWebView* wv, GParamSpec* pspec, gpointer data)
    return TRUE;
 }
 
-gboolean cb_wv_load_committed(WebKitWebView* wv, WebKitWebFrame* frame, gpointer user_data){
+gboolean cb_wv_load_status(WebKitWebView* wv, GParamSpec *p, gpointer user_data){
 
-   gchar *buffer = Client.Global.user_script->content;
-   if(!buffer){
-      notify(WARNING, "No script loaded");
-      return FALSE;
-   }
-   run_script(buffer, NULL, NULL);
+      WebKitLoadStatus status = webkit_web_view_get_load_status(wv);
 
-   // Flashblock stuff
-   if(fb_enabled){
-      FBFrames = NULL;
-      WebKitDOMDocument *doc = webkit_web_view_get_dom_document(wv);
-      WebKitDOMDOMWindow *win = webkit_dom_document_get_default_view(doc);
-      webkit_dom_event_target_add_event_listener(WEBKIT_DOM_EVENT_TARGET(win), "beforeload", G_CALLBACK(cb_flashblock_before_load), TRUE, NULL);
-      webkit_dom_event_target_add_event_listener(WEBKIT_DOM_EVENT_TARGET(win), "beforeunload", G_CALLBACK(cb_flashblock_before_unload), TRUE, NULL);
-   }
+      if(status==WEBKIT_LOAD_COMMITTED){
+         gchar *buffer = Client.Global.user_script->content;
+         if(!buffer){
+            notify(WARNING, "No script loaded");
+            return FALSE;
+         }
+         run_script(buffer, NULL, NULL);
 
-   return TRUE;
-}
+         // Flashblock stuff
+         if(fb_enabled){
+            FBFrames = NULL;
+            WebKitDOMDocument *doc = webkit_web_view_get_dom_document(wv);
+            WebKitDOMDOMWindow *win = webkit_dom_document_get_default_view(doc);
+            webkit_dom_event_target_add_event_listener(WEBKIT_DOM_EVENT_TARGET(win), "beforeload", G_CALLBACK(cb_flashblock_before_load), TRUE, NULL);
+            webkit_dom_event_target_add_event_listener(WEBKIT_DOM_EVENT_TARGET(win), "beforeunload", G_CALLBACK(cb_flashblock_before_unload), TRUE, NULL);
+         }
 
-gboolean cb_wv_load_finished(WebKitWebView *wv, WebKitWebFrame* frame, gpointer user_data){
+      } else if(status==WEBKIT_LOAD_FINISHED){
+      
+         update_client(gtk_notebook_get_current_page(Client.UI.webview));
 
-   update_client(gtk_notebook_get_current_page(Client.UI.webview));
+         gchar* uri = (gchar*) webkit_web_view_get_uri(wv);
+         if(!uri) return FALSE;
 
-   gchar* uri = (gchar*) webkit_web_view_get_uri(wv);
-   if(!uri) return FALSE;
+         //--- Update history -----
+         if(!private_browsing) {
+            // we verify if the new_uri is already present in the list
+            GList* l = g_list_find_custom(Client.Global.history, uri, (GCompareFunc)strcmp);
+            if (l) {
+               // new_uri is already present -> move it to the end of the list
+               Client.Global.history = g_list_remove_link(Client.Global.history, l);
+               Client.Global.history = g_list_concat(l, Client.Global.history);
+            } else 
+               Client.Global.history = g_list_prepend(Client.Global.history, g_strdup(uri));
+         }
+      }
 
-   //--- Update history -----
-   if(!private_browsing) {
-      // we verify if the new_uri is already present in the list
-      GList* l = g_list_find_custom(Client.Global.history, uri, (GCompareFunc)strcmp);
-      if (l) {
-         // new_uri is already present -> move it to the end of the list
-         Client.Global.history = g_list_remove_link(Client.Global.history, l);
-         Client.Global.history = g_list_concat(l, Client.Global.history);
-      } else 
-         Client.Global.history = g_list_prepend(Client.Global.history, g_strdup(uri));
-   }
-
-   return TRUE;
+      return TRUE;
 }
 
 gboolean cb_wv_new_window(WebKitWebView* wv, WebKitWebFrame* frame, WebKitNetworkRequest* request,

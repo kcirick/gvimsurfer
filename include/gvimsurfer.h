@@ -15,15 +15,8 @@
 #define GET_NTH_TAB(n) GET_WEBVIEW(gtk_notebook_get_nth_page(Client.UI.webview, n))
 #define GET_WEBVIEW(x) WEBKIT_WEB_VIEW(gtk_bin_get_child(GTK_BIN(x)))
 
-enum mode {
-   NORMAL             = 1 << 0,
-   INSERT             = 1 << 1,
-   VISUAL             = 1 << 2,
-   FOLLOW             = 1 << 3,
-   PASS_THROUGH       = 1 << 4,
-   PASS_THROUGH_NEXT  = 1 << 5,
-   ALL                = 0x5fffffff
-};
+
+enum mode { NORMAL, INSERT, HINTS, PASS_THROUGH };
 
 #define FORWARD      TRUE
 #define BACKWARD     FALSE
@@ -73,6 +66,11 @@ typedef struct {
    GList          *pagemarks;
 } Page;
    
+typedef struct {
+   gchar* uri;
+   gchar* tags;
+} BMark;
+
 typedef struct {
    gint     id;
    gdouble  hadjustment;

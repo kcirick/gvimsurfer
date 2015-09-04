@@ -9,6 +9,7 @@
 struct {
    struct {
       GtkWidget       *window;
+      GtkWidget       *add_button;
       GtkBox          *box;
       GtkWidget       *statusbar;
       GtkBox          *statusbar_box;

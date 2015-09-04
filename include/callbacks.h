@@ -9,8 +9,11 @@ gboolean    cb_blank();
 gboolean    cb_destroy(GtkWidget*, gpointer);
 gboolean    cb_download_progress(WebKitDownload*, GParamSpec*);
 
+gboolean    cb_button_add_tab(GtkButton*, GtkNotebook*);
 gboolean    cb_button_close_tab(GtkButton*, GtkNotebook*);
+
 gboolean    cb_notebook_switch_page(GtkNotebook*, gpointer, guint, gpointer);
+gboolean    cb_notebook_switch_page_after(GtkNotebook*, gpointer, guint, gpointer);
 
 gboolean    cb_inputbar_activate(GtkEntry*, gpointer);
 gboolean    cb_inputbar_kb_pressed(GtkWidget*, GdkEventKey*, gpointer);
@@ -31,8 +34,6 @@ gboolean    cb_wv_notify_title(WebKitWebView*, GParamSpec*, gpointer);
 gboolean    cb_wv_new_window(WebKitWebView*, WebKitWebFrame*, WebKitNetworkRequest*, 
       WebKitWebNavigationAction*, WebKitWebPolicyDecision*, gpointer);
 gboolean    cb_wv_scrolled(GtkAdjustment*, gpointer);
-gboolean    cb_wv_load_committed(WebKitWebView*, WebKitWebFrame*, gpointer);
-gboolean    cb_wv_load_finished(WebKitWebView*, WebKitWebFrame*, gpointer);
-
+gboolean    cb_wv_load_status(WebKitWebView*, GParamSpec*, gpointer);
 
 #endif

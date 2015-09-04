@@ -14,7 +14,6 @@
 #include "include/utilities.h"
 #include "include/callbacks.h"
 #include "include/shortcuts.h"
-#include "include/flashblock.h"
 
 #include "config/config.h"
 
@@ -32,6 +31,7 @@ void init_client() {
    //--- Init UI -----
    Client.UI.window        = gtk_window_new(GTK_WINDOW_TOPLEVEL);
 
+   Client.UI.add_button    = gtk_event_box_new();
    Client.UI.box           = GTK_BOX(gtk_vbox_new(FALSE, 0));
    Client.UI.statusbar     = gtk_event_box_new();
    Client.UI.statusbar_box = GTK_BOX(gtk_hbox_new(FALSE, 0));
@@ -42,7 +42,6 @@ void init_client() {
    gtk_window_set_wmclass(GTK_WINDOW(Client.UI.window), TARGET, NAME);
    GdkGeometry hints = { 1, 1 };
    gtk_window_set_geometry_hints(GTK_WINDOW(Client.UI.window), NULL, &hints, GDK_HINT_MIN_SIZE);
-   g_signal_connect(G_OBJECT(Client.UI.window), "destroy", G_CALLBACK(cb_destroy), NULL);
 
    // Box
    gtk_box_set_spacing(Client.UI.box, 0);
@@ -72,14 +71,21 @@ void init_client() {
    gtk_editable_set_editable(GTK_EDITABLE(Client.UI.inputbar), TRUE);
    gtk_entry_set_inner_border(Client.UI.inputbar, NULL);
 
-   g_signal_connect(G_OBJECT(Client.UI.inputbar), "key-press-event", G_CALLBACK(cb_inputbar_kb_pressed), NULL);
-   g_signal_connect(G_OBJECT(Client.UI.inputbar), "activate",        G_CALLBACK(cb_inputbar_activate),   NULL);
-
    // Webview
    gtk_notebook_set_show_tabs(Client.UI.webview,   show_tabbar?TRUE:FALSE);
    gtk_notebook_set_scrollable(Client.UI.webview,  TRUE);
    gtk_notebook_set_show_border(Client.UI.webview, FALSE);
-   g_signal_connect(G_OBJECT(Client.UI.webview), "switch-page", G_CALLBACK(cb_notebook_switch_page), NULL);
+
+   // Add "add-page" button
+   GtkWidget *tempbox   = gtk_scrolled_window_new(NULL, NULL);
+   GtkWidget *image     = gtk_image_new_from_stock (GTK_STOCK_ADD, GTK_ICON_SIZE_MENU);
+
+   gtk_event_box_set_visible_window(GTK_EVENT_BOX(Client.UI.add_button), FALSE);
+   gtk_container_add(GTK_CONTAINER(Client.UI.add_button), image);
+   gtk_widget_show_all( Client.UI.add_button );
+
+   gtk_notebook_append_page(Client.UI.webview, tempbox, Client.UI.add_button);
+   g_object_set_data(G_OBJECT(Client.UI.webview), "addtab", tempbox);
 
    // packing
    gtk_box_pack_start(Client.UI.box, GTK_WIDGET(Client.UI.webview),  TRUE,    TRUE,    0);
@@ -117,6 +123,14 @@ void init_client() {
    // set window size
    gtk_window_set_default_size(GTK_WINDOW(Client.UI.window), default_width, default_height);
 
+   // connect signals
+   g_signal_connect(Client.UI.window, "destroy",                  G_CALLBACK(cb_destroy), NULL);
+   g_signal_connect(Client.UI.inputbar, "key-press-event",        G_CALLBACK(cb_inputbar_kb_pressed), NULL);
+   g_signal_connect(Client.UI.inputbar, "activate",               G_CALLBACK(cb_inputbar_activate),   NULL);
+   g_signal_connect(Client.UI.add_button, "button_press_event",   G_CALLBACK(cb_button_add_tab), Client.UI.webview );
+   g_signal_connect(Client.UI.webview, "switch-page",             G_CALLBACK(cb_notebook_switch_page), NULL );
+   g_signal_connect_after(Client.UI.webview, "switch-page",       G_CALLBACK(cb_notebook_switch_page_after), NULL);
+   
    init_client_data();
 }
 
@@ -131,11 +145,15 @@ void init_client_data(){
 
          for(gint i = 0; i < n; i++) {
             if(!strlen(lines[i]))    continue;
+            
+            BMark* bmark = malloc(sizeof(BMark));
+            bmark->uri = g_strdup(strtok(lines[i], " "));
+            bmark->tags = g_strdup(strtok(NULL, "\n"));
 
-            Client.Global.bookmarks = g_list_append(Client.Global.bookmarks, lines[i]);
+            Client.Global.bookmarks = g_list_append(Client.Global.bookmarks, bmark);
          }
          g_free(content);
-         g_free(lines);
+         g_strfreev(lines);
       }
    }
 
@@ -150,12 +168,12 @@ void init_client_data(){
          for(gint i = 0; i < n; i++) {
             if(!strlen(lines[i]))   continue;
 
-            Client.Global.history = g_list_prepend(Client.Global.history, lines[i]);
+            Client.Global.history = g_list_prepend(Client.Global.history, g_strdup(g_strstrip(lines[i])));
          }
          Client.Global.history = g_list_reverse(Client.Global.history);
 
          g_free(content);
-         g_free(lines);
+         g_strfreev(lines);
       }
    }
 
@@ -171,13 +189,13 @@ void init_client_data(){
             if(!strlen(lines[i]) || !strlen(lines[i+1]))  continue;
 
             Session* se = malloc(sizeof(Session));
-            se->name = lines[i];
-            se->uris = lines[i+1];
+            se->name = g_strdup(lines[i]);
+            se->uris = g_strdup(lines[i+1]);
 
             Client.Global.sessions = g_list_prepend(Client.Global.sessions, se);
          }
          g_free(content);
-         g_free(lines);
+         g_strfreev(lines);
       }
    }
 
@@ -195,11 +213,11 @@ GtkWidget* create_tab(const gchar* uri, gboolean background) {
    GtkWidget *tab = gtk_scrolled_window_new(NULL, NULL);
    WebKitWebView *wv  = (WebKitWebView*)webkit_web_view_new();
 
-   int number_of_tabs = gtk_notebook_get_current_page(Client.UI.webview);
-   int position       = number_of_tabs + 1;
+   int number_of_tabs = gtk_notebook_get_n_pages(Client.UI.webview);
+   int position       = number_of_tabs-1;
 
    WebKitWebFrame* mf = webkit_web_view_get_main_frame(WEBKIT_WEB_VIEW(wv));
-   g_signal_connect(G_OBJECT(mf),  "scrollbars-policy-changed", G_CALLBACK(cb_blank), NULL);
+   g_signal_connect(mf,  "scrollbars-policy-changed", G_CALLBACK(cb_blank), NULL);
 
    if(show_scrollbars)
       gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(tab), GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
@@ -214,8 +232,7 @@ GtkWidget* create_tab(const gchar* uri, gboolean background) {
          "signal::download-requested",                   G_CALLBACK(cb_wv_download_request), NULL,
          "signal::hovering-over-link",                   G_CALLBACK(cb_wv_hover_link),       NULL,
          "signal::key-press-event",                      G_CALLBACK(cb_wv_kb_pressed),       NULL,
-         "signal::load-committed",                       G_CALLBACK(cb_wv_load_committed),   NULL,
-         "signal::load-finished",                        G_CALLBACK(cb_wv_load_finished),    NULL,
+         "signal::notify::load-status",                  G_CALLBACK(cb_wv_load_status),      NULL,
          "signal::load-progress-changed",                G_CALLBACK(cb_wv_notify_progress),  NULL,
          "signal::mime-type-policy-decision-requested",  G_CALLBACK(cb_wv_mime_type),        NULL,
          "signal::navigation-policy-decision-requested", G_CALLBACK(cb_wv_navigation),       NULL,
@@ -225,8 +242,8 @@ GtkWidget* create_tab(const gchar* uri, gboolean background) {
 
    // connect tab callbacks
    GtkAdjustment* adjustment = gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(tab));
-   g_signal_connect(G_OBJECT(tab),        "key-press-event", G_CALLBACK(cb_tab_kb_pressed), NULL);
-   g_signal_connect(G_OBJECT(adjustment), "value-changed",   G_CALLBACK(cb_wv_scrolled),    NULL);
+   g_signal_connect(tab,        "key-press-event", G_CALLBACK(cb_tab_kb_pressed), NULL);
+   g_signal_connect(adjustment, "value-changed",   G_CALLBACK(cb_wv_scrolled),    NULL);
 
    /* set default values */
    g_object_set(G_OBJECT(wv), "full-content-zoom", full_content_zoom, NULL);
@@ -235,7 +252,6 @@ GtkWidget* create_tab(const gchar* uri, gboolean background) {
    page->wv             = wv;
    page->pagemarks      = NULL; 
 
-   /////
    /* apply browser setting */
    WebKitWebSettings *settings = (WebKitWebSettings*)webkit_web_settings_new();
 
@@ -281,7 +297,7 @@ GtkWidget * create_notebook_label( const gchar *text, GtkWidget *notebook, gint 
    GtkWidget *button   = gtk_event_box_new();
 
    g_object_set_data( G_OBJECT(button), "page", GINT_TO_POINTER(page) );
-   g_signal_connect( G_OBJECT(button), "button_press_event", G_CALLBACK(cb_button_close_tab), GTK_NOTEBOOK(notebook) );
+   g_signal_connect(button, "button_press_event", G_CALLBACK(cb_button_close_tab), GTK_NOTEBOOK(notebook) );
 
    gtk_box_pack_start(GTK_BOX(hbox),   label,  TRUE,  TRUE,    0);
    gtk_box_pack_end(GTK_BOX(hbox),     button, FALSE, FALSE,   0);
@@ -307,8 +323,12 @@ void close_tab(gint tab_id) {
 
    Client.Global.last_closed = g_strdup((gchar *) webkit_web_view_get_uri(GET_CURRENT_TAB()));
 
-   if (gtk_notebook_get_n_pages(Client.UI.webview) > 1) {
+   // Note: Last tab is always "addtab" button
+   if (gtk_notebook_get_n_pages(Client.UI.webview) > 2) {
       gtk_notebook_remove_page(Client.UI.webview, tab_id);
+      if(tab_id == gtk_notebook_get_n_pages(Client.UI.webview)-1)
+         gtk_notebook_set_current_page(Client.UI.webview, tab_id-1);
+
       update_client(gtk_notebook_get_current_page(Client.UI.webview));
    } else 
       cb_destroy(NULL, NULL);
@@ -345,7 +365,10 @@ void update_client(gint tab_id){
    //--- update tabbar -----
    int number_of_tabs  = gtk_notebook_get_n_pages(Client.UI.webview);
    for(int tc = 0; tc < number_of_tabs; tc++) {
+      GtkWidget* addpage = g_object_get_data(G_OBJECT(Client.UI.webview), "addtab");
       GtkWidget* tab       = GTK_WIDGET(GET_NTH_TAB_WIDGET(tc));
+
+      if(addpage == tab) continue;
 
       const gchar* tab_title = webkit_web_view_get_title(GET_WEBVIEW(tab));
       int progress = webkit_web_view_get_progress(GET_WEBVIEW(tab)) * 100;
@@ -360,7 +383,6 @@ void update_client(gint tab_id){
 
       GtkWidget* label = gtk_notebook_get_tab_label(Client.UI.webview, tab);
       label = create_notebook_label(new_tab_title, GTK_WIDGET(Client.UI.webview), tc);
-      //gtk_notebook_set_tab_label_text(Client.UI.webview, tab, new_tab_title);
       gtk_notebook_set_tab_label(Client.UI.webview, tab, label);
       g_free(n_tab_title);
       g_free(new_tab_title);
