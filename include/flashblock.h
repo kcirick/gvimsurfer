@@ -13,6 +13,10 @@ typedef struct{
 
 GList* FBFrames;
 
+gchar* fbcolor_bg;
+gchar* fbcolor_fg;
+gchar* fbcolor_border;
+
 void     flashblock_create_click_element(WebKitDOMElement*);
 
 void     cb_flashblock_onclick(WebKitDOMElement*, WebKitDOMEvent*, gpointer); 

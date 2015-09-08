@@ -24,12 +24,12 @@
 #include "config/commands.h"
 #include "config/binds.h"
 
-static gint page_id;
+static gint static_page_id;
 
 gboolean cb_blank() { return TRUE; }
 
 gboolean cb_destroy(GtkWidget* widget, gpointer data) {
-   cmd_quitall(0, NULL);
+   cmd_closeall(0, NULL);
    return TRUE;
 }
 
@@ -67,7 +67,7 @@ gboolean cb_button_close_tab(GtkButton *button, GtkNotebook *notebook) {
 }
 
 gboolean cb_notebook_switch_page(GtkNotebook *notebook, gpointer page, guint page_num, gpointer user_data) {
-   page_id = gtk_notebook_get_current_page(notebook);
+   static_page_id = gtk_notebook_get_current_page(notebook);
    return TRUE;
 }
 
@@ -75,10 +75,9 @@ gboolean cb_notebook_switch_page(GtkNotebook *notebook, gpointer page, guint pag
 gboolean cb_notebook_switch_page_after(GtkNotebook *notebook, gpointer page, guint page_num, gpointer user_data) {
    GtkWidget* addpage = g_object_get_data(G_OBJECT(notebook), "addtab");
    if(GTK_WIDGET(page) == addpage){
-      gtk_notebook_set_current_page(notebook, page_id);
+      gtk_notebook_set_current_page(notebook, static_page_id);
       return FALSE;
    } 
-   
    update_client(page_num);
 
    return TRUE;
@@ -97,7 +96,7 @@ gboolean cb_inputbar_activate(GtkEntry* entry, gpointer data) {
       return FALSE;
    }
 
-   // search command 
+   // search mode 
    if(identifier == '/'){
       search_and_highlight(FORWARD, (gchar*)input+1);
 
@@ -122,9 +121,7 @@ gboolean cb_inputbar_activate(GtkEntry* entry, gpointer data) {
    }
 
    if(!succ) notify(ERROR, "Unknown command");
-
-   if(retv) clear_input();
-   else     set_inputbar_visibility(HIDE); 
+   retv ? clear_input() : set_inputbar_visibility(HIDE); 
 
    g_strfreev(tokens);
 
@@ -365,7 +362,7 @@ gboolean cb_wv_load_status(WebKitWebView* wv, GParamSpec *p, gpointer user_data)
          if(!uri) return FALSE;
 
          //--- Update history -----
-         if(!private_browsing) {
+         if(!private_mode) {
             // we verify if the new_uri is already present in the list
             GList* l = g_list_find_custom(Client.Global.history, uri, (GCompareFunc)strcmp);
             if (l) {

@@ -25,7 +25,7 @@ static const Setting settings[] = {
    { "images",                NULL,                "auto-load-images",        'b' },   // Load images automatically
    { "java_applet",           NULL,                "enable-java-applet",      'b' },   // Enable Java <applet> tag
    { "page_cache",            NULL,                "enable-page-cache",       'b' },   // Enable page cache
-   { "private",               &(private_browsing), "enable-private-browsing", 'b' },   // Enable private browsing
+   { "private",               &(private_mode),     "enable-private-browsing", 'b' },   // Enable private browsing
    { "resizable_text_areas",  NULL,                "resizable-text-areas",    'b' },   // Resizable text areas
    { "scrollbars",            &(show_scrollbars),  NULL,                      'b' },   // Show scrollbars
    { "statusbar",             &(show_statusbar),   NULL,                      'b' },   // Show statusbar

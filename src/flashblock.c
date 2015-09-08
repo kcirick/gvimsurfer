@@ -61,16 +61,16 @@ void flashblock_create_click_element(WebKitDOMElement *element){
          display: table-cell;\
          vertical-align: middle;\
          text-align: center;\
-         color: #FFFFFF;\
-         background: #000000;\
-         border: 2px solid #FF0000;\
+         color: %s;\
+         background: %s;\
+         border: 2px solid %s;\
          font: 12px monospace bold;\
          position: %s;\
          width: %dpx;\
          height: %dpx;\
          top: %s;\
          left: %s;\
-         z-index: 1000;", position, w, h, top, left);
+         z-index: 1000;", fbcolor_fg, fbcolor_bg, fbcolor_border, position, w, h, top, left);
     webkit_dom_element_set_attribute(div, "style", div_style, NULL);
     g_free(div_style);
 

@@ -46,7 +46,7 @@ int main(int argc, char* argv[]) {
    init_client();
 
    // put private browsing flag after initialization
-   private_browsing = private;
+   private_mode = private;
 
    //--- create tab -----
    if(argc < 2)

@@ -54,6 +54,7 @@ A WebkitGTK-based Web browser that looks and works like gVim
 
   - 0.4 (Work-in-progress):
    - Implement flash block
+    - BG/FG/Border colours can be configured in configrc
    - Bookmarks support tags
    - Adding "add new tab" button
    - Completion row displays helpful information
@@ -82,8 +83,9 @@ A WebkitGTK-based Web browser that looks and works like gVim
 
 ## To do / Known issues:
 
-  - BUG: Several GLib-GObject warnings to address
+  - TODO: Add command to reorder tabs
   - TODO: Code cleanup
+  - DONE: ~~Several GLib-GObject warnings to address~~ -> Ignore
   - DONE: ~~Implement flash block~~ (could still be buggy)
   - DONE: ~~Implement adblock~~ -> use css stylesheet
   - DONE: ~~Make install/uninstall routine to Makefile~~

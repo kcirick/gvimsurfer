@@ -15,6 +15,7 @@
 #include "include/utilities.h"
 #include "include/callbacks.h"
 #include "include/completion.h"
+#include "include/flashblock.h"
 
 #include "config/config.h"
 
@@ -302,24 +303,34 @@ gboolean read_configuration(gchar* configrc) {
       if(!strcmp(id, "statusbar_color")){
          gchar   **colors  = g_strsplit_set(value, " ", -1);
          gint   num_colors = g_strv_length(colors);
-         if(num_colors !=5) notify(WARNING, "Numbers of colors is not 5!");
+         if(num_colors !=5) notify(WARNING, "Number of colors is not 5!");
          
          gdk_color_parse(colors[0],    &(Client.Style.statusbar_bg));
          gdk_color_parse(colors[1],    &(Client.Style.statusbar_fg));
          gdk_color_parse(colors[2],    &(Client.Style.statusbar_ssl_fg));
          gdk_color_parse(colors[3],    &(Client.Style.inputbar_fg));
          gdk_color_parse(colors[4],    &(Client.Style.notification_fg));
-         g_free(colors);
+         g_strfreev(colors);
       }
       if(!strcmp(id, "completion_color")){
          gchar    **colors = g_strsplit_set(value, " ", -1);
          gint   num_colors = g_strv_length(colors);
-         if(num_colors !=3) notify(WARNING, "Numbers of colors is not 3!");
+         if(num_colors !=3) notify(WARNING, "Number of colors is not 3!");
          
          gdk_color_parse(colors[0],    &(Client.Style.completion_bg));
          gdk_color_parse(colors[1],    &(Client.Style.completion_fg));
          gdk_color_parse(colors[2],    &(Client.Style.completion_hl));
-         g_free(colors);
+         g_strfreev(colors);
+      }
+      if(!strcmp(id, "flashblock_color")){
+         gchar    **colors = g_strsplit_set(value, " ", -1);
+         gint   num_colors = g_strv_length(colors);
+         if(num_colors !=3) notify(WARNING, "Number of colors is not 3!");
+
+         fbcolor_bg = g_strdup(colors[0]);
+         fbcolor_fg = g_strdup(colors[1]);
+         fbcolor_border = g_strdup(colors[2]);
+         g_strfreev(colors);
       }
    }
    g_free(lines);

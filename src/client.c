@@ -359,7 +359,7 @@ void update_client(gint tab_id){
    gtk_label_set_text((GtkLabel*) Client.Statusbar.uri, uri);
 
    //--- update title -----
-   gchar* title = g_strdup_printf("%s %s: %s", NAME, private_browsing ? "(PRIVATE)" : "", webkit_web_view_get_title(this_wv));
+   gchar* title = g_strdup_printf("%s %s: %s", NAME, private_mode ? "(PRIVATE)" : "", webkit_web_view_get_title(this_wv));
    if(title)    gtk_window_set_title(GTK_WINDOW(Client.UI.window), title);
 
    //--- update tabbar -----

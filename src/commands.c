@@ -38,20 +38,24 @@ gboolean cmd_bookmark(int argc, char** argv) {
    gchar* tags = "";
    if(argc >= 1 && argv[argc] == NULL)
       tags = g_strjoinv(" ", argv);
-   new_bmark -> uri = this_uri;
-   new_bmark -> tags = tags;
+   new_bmark -> uri = g_strdup(this_uri);
+   new_bmark -> tags = g_strdup(tags);
    
    Client.Global.bookmarks = g_list_append(Client.Global.bookmarks, new_bmark);
+   g_free(this_uri); g_free(tags);
 
    return TRUE;
 }
 
 gboolean cmd_handle_downloads(int argc, char** argv){
-
    if(argc<1) return FALSE;
 
-   gint which = atoi(argv[argc-1]);
+   if(!g_strcmp0(argv[0], "list")){
+      run_completion(NEXT);
+      return TRUE;
+   }
 
+   gint which = atoi(argv[argc-1]);
    WebKitDownload* this_download = (WebKitDownload*)g_list_nth_data(Client.Global.active_downloads, which);
    if(!this_download){
       notify(WARNING, "No such download!");
@@ -75,7 +79,7 @@ gboolean cmd_forward(int argc, char** argv) {
 }
 
 gboolean cmd_open(int argc, char** argv) {
-  if(argc <= 0)            return TRUE;
+  if(argc < 1)             return TRUE;
   if(argv[argc] != NULL)   return TRUE;
 
   gchar* uri = g_strjoinv(" ", argv);
@@ -90,13 +94,13 @@ gboolean cmd_open(int argc, char** argv) {
 gboolean cmd_pagemark(int argc, char** argv){
    if(argc<1) return FALSE;
 
-   int id = atoi(argv[0]);
+   gint id = atoi(argv[0]);
    GtkAdjustment* adjustment;
    adjustment = gtk_scrolled_window_get_vadjustment(GET_CURRENT_TAB_WIDGET());
    gdouble va = gtk_adjustment_get_value(adjustment);
    adjustment = gtk_scrolled_window_get_hadjustment(GET_CURRENT_TAB_WIDGET());
    gdouble ha = gtk_adjustment_get_value(adjustment);
-   float zl   = webkit_web_view_get_zoom_level(GET_CURRENT_TAB());
+   gfloat zl   = webkit_web_view_get_zoom_level(GET_CURRENT_TAB());
 
    Page* page = get_current_page();
 
@@ -127,8 +131,8 @@ gboolean cmd_pagemark(int argc, char** argv){
 gboolean cmd_quickmark(int argc, char** argv){
    if(argc<1) return FALSE;
 
-   int id = atoi(argv[0]);
-   char* this_uri = (char*) webkit_web_view_get_uri(GET_CURRENT_TAB());
+   gint id = atoi(argv[0]);
+   gchar* this_uri = g_strdup(webkit_web_view_get_uri(GET_CURRENT_TAB()));
 
    // search if entry already exists
    for(GList* list = Client.Global.quickmarks; list; list = g_list_next(list)){
@@ -146,21 +150,22 @@ gboolean cmd_quickmark(int argc, char** argv){
    qmark->uri  = this_uri;
 
    Client.Global.quickmarks = g_list_append(Client.Global.quickmarks, qmark);
-
+   g_free(this_uri);
+   
    return TRUE;
 }
 
-gboolean cmd_quit(int argc, char** argv) {
+gboolean cmd_close(int argc, char** argv) {
    close_tab(gtk_notebook_get_current_page(Client.UI.webview));
    return TRUE;
 }
 
-gboolean cmd_quitall(int argc, char** argv) {
+gboolean cmd_closeall(int argc, char** argv) {
 
    pango_font_description_free(Client.Style.font);
 
    // write bookmarks and history
-   if(!private_browsing)   cmd_write(0, NULL);
+   if(!private_mode)   cmd_write(0, NULL);
 
    // clear bookmarks
    for(GList* list = Client.Global.bookmarks; list; list = g_list_next(list))

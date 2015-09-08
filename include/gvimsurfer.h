@@ -84,6 +84,6 @@ typedef struct {
 } QMark;
 
 //--- variables -----
-gboolean private_browsing;
+gboolean private_mode;
 
 #endif
